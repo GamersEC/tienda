@@ -1,0 +1,50 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Gestionar Productos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>Productos</h2>
+    <!-- SOLO MUESTRA ESTE BOTÓN SI EL USUARIO ES ADMIN -->
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.crear_producto') }}" class="btn btn-primary mb-3">Añadir Nuevo Producto</a>
+    {% endif %}
+</div>
+<table class="table">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Precio</th>
+        <th>Stock</th>
+        <!-- SOLO MUESTRA LA COLUMNA DE ACCIONES SI ES ADMIN -->
+        {% if current_user.is_admin %}
+        <th>Acciones</th>
+        {% endif %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for producto in productos %}
+    <tr>
+        <td>{{ producto.id }}</td>
+        <td>{{ producto.nombre }}</td>
+        <td>${{ "%.2f"|format(producto.precio) }}</td>
+        <td>{{ producto.stock }}</td>
+        <!-- SOLO MUESTRA LOS BOTONES SI ES ADMIN -->
+        {% if current_user.is_admin %}
+        <td>
+            <a href="{{ url_for('admin.editar_producto', id=producto.id) }}" class="btn btn-sm btn-warning">Editar</a>
+            <form action="{{ url_for('admin.eliminar_producto', id=producto.id) }}" method="post" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar este producto?');">Eliminar</button>
+            </form>
+        </td>
+        {% endif %}
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="5">No hay productos registrados.</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

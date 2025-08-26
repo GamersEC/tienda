@@ -1,0 +1,92 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Editando Venta #{{ venta.id }}{% endblock %}
+
+{% block content %}
+<h2>Editando Venta #{{ venta.id }} para {{ venta.cliente.nombre }}</h2>
+<hr>
+
+<div class="row g-4">
+    <!-- Columna Izquierda: Productos en la Venta y Notas -->
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">
+                <h4>Productos en esta Venta</h4>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th class="text-end">Subtotal</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in venta.productos_asociados %}
+                    <tr>
+                        <td>{{ item.producto.nombre }}<br><small class="text-muted">${{ "%.2f"|format(item.precio_unitario) }} c/u</small></td>
+                        <td>{{ item.cantidad }}</td>
+                        <td class="text-end">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
+                        <td class="text-end">
+                            <form action="{{ url_for('admin.eliminar_producto_venta', venta_id=venta.id, producto_asociado_id=item.id) }}" method="post">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Quitar este producto?');">&times;</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">Aún no hay productos en esta venta.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                    <tr>
+                        <th colspan="2" class="text-end fs-5">Total:</th>
+                        <th class="text-end fs-5">${{ "%.2f"|format(venta.monto_total) }}</th>
+                        <th></th>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header"><h4>Notas Adicionales</h4></div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {{ editar_venta_form.hidden_tag() }}
+                    {{ editar_venta_form.notas(class="form-control", rows=3) }}
+                    <button type="submit" name="submit_notas" value="guardar" class="btn btn-secondary mt-2">Guardar Notas</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Añadir Producto y Finalizar -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header"><h4>Añadir Producto</h4></div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {{ agregar_producto_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ agregar_producto_form.producto.label(class="form-label") }}
+                        {{ agregar_producto_form.producto(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ agregar_producto_form.cantidad.label(class="form-label") }}
+                        {{ agregar_producto_form.cantidad(class="form-control") }}
+                    </div>
+                    <button type="submit" name="submit_producto" value="agregar" class="btn btn-primary w-100">Añadir Producto</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+            <form action="{{ url_for('admin.finalizar_venta', id=venta.id) }}" method="post">
+                <button type="submit" class="btn btn-success btn-lg w-100">Finalizar y Proceder a Pagos</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

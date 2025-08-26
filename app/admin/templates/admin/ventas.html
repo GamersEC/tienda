@@ -1,0 +1,50 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Gestionar Ventas{% endblock %}
+
+{% block content %}
+<h2>Ventas</h2>
+<a href="{{ url_for('admin.crear_venta') }}" class="btn btn-primary mb-3">Registrar Nueva Venta</a>
+<table class="table">
+    <thead>
+    <tr>
+        <th>ID Venta</th>
+        <th>Cliente</th>
+        <th>Fecha</th>
+        <th>Monto Total</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for venta in ventas %}
+    <tr>
+        <td>{{ venta.id }}</td>
+        <td>{{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</td>
+        <td>{{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>${{ "%.2f"|format(venta.monto_total) }}</td>
+        <td>
+                    <span class="badge
+                        {% if venta.estado == 'Pagada' %}bg-success
+                        {% elif venta.estado == 'Pendiente' %}bg-warning text-dark
+                        {% elif venta.estado == 'En Proceso' %}bg-info text-dark
+                        {% endif %}">
+                        {{ venta.estado }}
+                    </span>
+        </td>
+        <td>
+            {% if venta.estado == 'En Proceso' %}
+            <a href="{{ url_for('admin.editar_venta', id=venta.id) }}" class="btn btn-sm btn-primary">Añadir Productos</a>
+            {% else %}
+            <a href="{{ url_for('admin.ver_venta', id=venta.id) }}" class="btn btn-sm btn-info">Ver Detalles</a>
+            {% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="6">No hay ventas registradas.</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

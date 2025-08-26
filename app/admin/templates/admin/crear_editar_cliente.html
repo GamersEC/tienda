@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<h2>{{ titulo }}</h2>
+<form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form.nombre.label(class="form-label") }}
+            {{ form.nombre(class="form-control") }}
+        </div>
+        <div class="col-md-6 mb-3">
+            {{ form.apellido.label(class="form-label") }}
+            {{ form.apellido(class="form-control") }}
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form.telefono.label(class="form-label") }}
+            {{ form.telefono(class="form-control") }}
+        </div>
+        <div class="col-md-6 mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control") }}
+        </div>
+    </div>
+    {{ form.submit(class="btn btn-success") }}
+    <a href="{{ url_for('admin.listar_clientes') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

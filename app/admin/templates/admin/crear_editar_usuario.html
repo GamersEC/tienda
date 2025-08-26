@@ -1,0 +1,40 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<h2>{{ titulo }}</h2>
+<form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        {{ form.nombre.label(class="form-label") }}
+        {{ form.nombre(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.email.label(class="form-label") }}
+        {{ form.email(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.rol.label(class="form-label") }}
+        {{ form.rol(class="form-select") }}
+    </div>
+    <hr>
+    <p class="text-muted small">
+        {% if 'Editar' in titulo %}
+        Deja los campos de contraseña en blanco para mantener la contraseña actual.
+        {% else %}
+        La contraseña es obligatoria para nuevos usuarios.
+        {% endif %}
+    </p>
+    <div class="mb-3">
+        {{ form.password.label(class="form-label") }}
+        {{ form.password(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.password2.label(class="form-label") }}
+        {{ form.password2(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-success") }}
+    <a href="{{ url_for('admin.listar_usuarios') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

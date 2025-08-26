@@ -1,0 +1,17 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Iniciar Nueva Venta{% endblock %}
+
+{% block content %}
+<h2>Iniciar Nueva Venta</h2>
+<p>Selecciona un cliente para comenzar a registrar la venta.</p>
+<form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        {{ form.cliente.label(class="form-label") }}
+        {{ form.cliente(class="form-select") }}
+    </div>
+    {{ form.submit(class="btn btn-success") }}
+    <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}
