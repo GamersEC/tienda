@@ -1,0 +1,86 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Detalle de {{ tipo.nombre }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_tipos_producto') }}">Tipos de Producto</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ tipo.nombre }}</li>
+    </ol>
+</nav>
+<h2>Diseñar Tipo de Producto: <strong>{{ tipo.nombre }}</strong></h2>
+<p class="text-muted">Define los campos personalizados que tendrán todos los productos de este tipo.</p>
+<hr>
+
+<div class="row g-4">
+    <!-- Columna para añadir nuevos atributos -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Añadir Nuevo Atributo</div>
+            <div class="card-body">
+                <form action="{{ url_for('admin.crear_atributo', id=tipo.id) }}" method="post" novalidate>
+                    {{ atributo_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ atributo_form.nombre_atributo.label(class="form-label") }}
+                        {{ atributo_form.nombre_atributo(class="form-control", placeholder="Ej: Color, Talla, Material") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ atributo_form.tipo_campo.label(class="form-label") }}
+                        {{ atributo_form.tipo_campo(class="form-select") }}
+                    </div>
+                    <div class="d-grid">
+                        {{ atributo_form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna para mostrar los atributos existentes -->
+    <div class="col-md-8">
+        <h4>Atributos Definidos</h4>
+        {% for atributo in tipo.atributos %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>{{ atributo.nombre_atributo }}</strong>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-secondary me-2">{{ atributo.tipo_campo }}</span>
+                    <form action="{{ url_for('admin.eliminar_atributo', id=atributo.id) }}" method="post">
+                        {{ atributo_form.hidden_tag() }}
+                        <button type="submit" class="btn-close" aria-label="Close" onclick="return confirm('¿Eliminar este atributo?');"></button>
+                    </form>
+                </div>
+            </div>
+            {% if atributo.tipo_campo == 'Seleccion' %}
+            <div class="card-body">
+                <h6>Opciones</h6>
+                <ul class="list-group list-group-flush">
+                    {% for opcion in atributo.opciones %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ opcion.valor_opcion }}
+                        <form action="{{ url_for('admin.eliminar_opcion_atributo', id=opcion.id) }}" method="post">
+                            {{ opcion_form.hidden_tag() }}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta opción?');">&times;</button>
+                        </form>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted">Aún no hay opciones.</li>
+                    <li class="list-group-item text-muted">Aún no hay opciones.</li>
+                    {% endfor %}
+                </ul>
+                <hr>
+                <form action="{{ url_for('admin.crear_opcion_atributo', id=atributo.id) }}" method="post" class="d-flex gap-2">
+                    {{ opcion_form.hidden_tag() }}
+                    {{ opcion_form.valor_opcion(class="form-control form-control-sm", placeholder="Ej: S, M, L, XL") }}
+                    {{ opcion_form.submit(class="btn btn-sm btn-primary") }}
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">Aún no has añadido atributos para este tipo de producto.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

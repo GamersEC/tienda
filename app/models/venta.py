@@ -5,10 +5,18 @@ class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     fecha_venta = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     monto_total = db.Column(db.Numeric(10, 2), nullable=False)
-    estado = db.Column(db.String(20), nullable=False, default='Pendiente') # Pendiente, Pagada
+    estado = db.Column(db.String(20), nullable=False, default='En Proceso')
+
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'))
     notas = db.Column(db.Text, nullable=True)
-    pagos = db.relationship('Pago', backref='venta', lazy='dynamic', order_by='Pago.fecha_pago.asc()')
+
+    anulada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    motivo_anulacion = db.Column(db.Text, nullable=True)
+    fecha_anulacion = db.Column(db.DateTime, nullable=True)
+
+    #Relaciones
+    anulada_por = db.relationship('Usuario')
+    pagos = db.relationship('Pago', backref='venta', lazy='dynamic')
     productos_asociados = db.relationship('VentaProducto', back_populates='venta', cascade="all, delete-orphan")
 
     def __repr__(self):

@@ -4,14 +4,67 @@
 
 {% block content %}
 <h2>Iniciar Nueva Venta</h2>
-<p>Selecciona un cliente para comenzar a registrar la venta.</p>
+<p>Busca un cliente por nombre o cédula/RUC para comenzar.</p>
+
 <form method="post" novalidate>
     {{ form.hidden_tag() }}
+    <!-- Este input oculto guardará el ID del cliente seleccionado -->
+    <input type="hidden" name="cliente_id" id="cliente_id" required>
+
     <div class="mb-3">
-        {{ form.cliente.label(class="form-label") }}
-        {{ form.cliente(class="form-select") }}
+        <label for="search_cliente" class="form-label">Buscar Cliente</label>
+        <input type="text" id="search_cliente" class="form-control" placeholder="Escribe para buscar...">
     </div>
-    {{ form.submit(class="btn btn-success") }}
+
+    <!-- Aquí se mostrarán los resultados de la búsqueda -->
+    <div id="search_results" class="list-group mb-3"></div>
+
+    <!-- Mostramos el cliente seleccionado -->
+    <div id="selected_client" class="alert alert-info" style="display: none;"></div>
+
+    <button type="submit" id="submit_button" class="btn btn-success" disabled>Iniciar Venta</button>
     <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-secondary">Cancelar</a>
 </form>
+
+<script>
+    const searchInput = document.getElementById('search_cliente');
+    const resultsDiv = document.getElementById('search_results');
+    const selectedClientDiv = document.getElementById('selected_client');
+    const hiddenInput = document.getElementById('cliente_id');
+    const submitButton = document.getElementById('submit_button');
+
+    searchInput.addEventListener('input', async function() {
+        const query = this.value;
+        if (query.length < 2) {
+            resultsDiv.innerHTML = '';
+            return;
+        }
+
+        const response = await fetch(`{{ url_for('admin.buscar_clientes') }}?q=${query}`);
+        const clients = await response.json();
+
+        resultsDiv.innerHTML = '';
+        clients.forEach(client => {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.className = 'list-group-item list-group-item-action';
+            a.textContent = client.text;
+            a.dataset.clientId = client.id;
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                selectClient(client);
+            });
+            resultsDiv.appendChild(a);
+        });
+    });
+
+    function selectClient(client) {
+        hiddenInput.value = client.id;
+        selectedClientDiv.textContent = `Cliente seleccionado: ${client.text}`;
+        selectedClientDiv.style.display = 'block';
+        resultsDiv.innerHTML = '';
+        searchInput.value = '';
+        submitButton.disabled = false;
+    }
+</script>
 {% endblock %}

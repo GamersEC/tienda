@@ -9,7 +9,7 @@ def login():
     print("--- DEBUG: Petición recibida en la ruta /login ---", flush=True)
 
     if current_user.is_authenticated:
-        return redirect(url_for('admin.listar_ventas'))
+        return redirect(url_for('admin.dashboard'))
     print("--- DEBUG: A punto de instanciar LoginForm() ---", flush=True)
 
     try:
@@ -30,7 +30,7 @@ def login():
 
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
-            next_page = url_for('admin.listar_ventas')
+            next_page = url_for('admin.dashboard')
         return redirect(next_page)
     print("--- DEBUG: A punto de llamar a render_template('login.html') ---", flush=True)
 

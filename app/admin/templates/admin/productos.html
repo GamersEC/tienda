@@ -3,48 +3,74 @@
 {% block title %}Gestionar Productos{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center">
-    <h2>Productos</h2>
-    <!-- SOLO MUESTRA ESTE BOTÓN SI EL USUARIO ES ADMIN -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Gestionar Productos</h2>
     {% if current_user.is_admin %}
-    <a href="{{ url_for('admin.crear_producto') }}" class="btn btn-primary mb-3">Añadir Nuevo Producto</a>
+    <a href="{{ url_for('admin.seleccionar_tipo_producto') }}" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z"/>
+        </svg>
+        Añadir Nuevo Producto
+    </a>
     {% endif %}
 </div>
-<table class="table">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>Nombre</th>
-        <th>Precio</th>
-        <th>Stock</th>
-        <!-- SOLO MUESTRA LA COLUMNA DE ACCIONES SI ES ADMIN -->
-        {% if current_user.is_admin %}
-        <th>Acciones</th>
-        {% endif %}
-    </tr>
-    </thead>
-    <tbody>
-    {% for producto in productos %}
-    <tr>
-        <td>{{ producto.id }}</td>
-        <td>{{ producto.nombre }}</td>
-        <td>${{ "%.2f"|format(producto.precio) }}</td>
-        <td>{{ producto.stock }}</td>
-        <!-- SOLO MUESTRA LOS BOTONES SI ES ADMIN -->
-        {% if current_user.is_admin %}
-        <td>
-            <a href="{{ url_for('admin.editar_producto', id=producto.id) }}" class="btn btn-sm btn-warning">Editar</a>
-            <form action="{{ url_for('admin.eliminar_producto', id=producto.id) }}" method="post" style="display:inline;">
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro de que quieres eliminar este producto?');">Eliminar</button>
-            </form>
-        </td>
-        {% endif %}
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="5">No hay productos registrados.</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-hover mb-0">
+            <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Tipo</th>
+                <th>Detalles (Atributos)</th>
+                <th class="text-end">Precio</th>
+                <th class="text-end">Stock</th>
+                {% if current_user.is_admin %}
+                <th class="text-end">Acciones</th>
+                {% endif %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for producto in productos %}
+            <tr>
+                <td>
+                    <strong>{{ producto.nombre }}</strong>
+                </td>
+                <td>
+                    <span class="badge bg-secondary">{{ producto.tipo_producto.nombre }}</span>
+                </td>
+                <td>
+                    <!-- Iteramos sobre los atributos dinámicos del producto -->
+                    <ul class="list-unstyled mb-0 small">
+                        {% for valor_atributo in producto.valores_atributos %}
+                        <li>
+                            <strong>{{ valor_atributo.atributo.nombre_atributo }}:</strong> {{ valor_atributo.valor }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </td>
+                <td class="text-end">${{ "%.2f"|format(producto.precio) }}</td>
+                <td class="text-end">{{ producto.stock }}</td>
+
+                {% if current_user.is_admin %}
+                <td class="text-end">
+                    <a href="{{ url_for('admin.editar_producto', id=producto.id) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                    <form action="{{ url_for('admin.eliminar_producto', id=producto.id) }}" method="post" class="d-inline ms-1">
+                        {{ form.hidden_tag() }}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Estás seguro?');">Eliminar</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center p-4">
+                    No hay productos registrados.
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}

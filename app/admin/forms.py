@@ -1,25 +1,19 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField
+from flask_wtf.file import FileAllowed
+from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField, FileField
 from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional
 from wtforms_sqlalchemy.fields import QuerySelectField
 from app.models.cliente import Cliente
 
 
-class ProductoForm(FlaskForm):
-    nombre = StringField('Nombre del Producto', validators=[DataRequired()])
-    descripcion = TextAreaField('Descripción')
-    precio = DecimalField('Precio', validators=[DataRequired(), NumberRange(min=0)])
-    talla = StringField('Talla')
-    color = StringField('Color')
-    stock = IntegerField('Stock Disponible', validators=[DataRequired(), NumberRange(min=0)])
-    submit = SubmitField('Guardar Producto')
-
-
 class ClienteForm(FlaskForm):
     nombre = StringField('Nombre', validators=[DataRequired()])
     apellido = StringField('Apellido')
+    identificacion = StringField('Cédula / RUC')
     telefono = StringField('Teléfono')
     email = StringField('Email')
+    direccion = StringField('Dirección (Calles)')
+    ciudad = StringField('Ciudad')
     submit = SubmitField('Guardar Cliente')
 
 
@@ -35,10 +29,11 @@ class VentaForm(FlaskForm):
 
 class PagoForm(FlaskForm):
     monto_pago = DecimalField('Monto del Pago', validators=[DataRequired(), NumberRange(min=0.01)])
-    metodo_pago = SelectField('Método de Pago', choices=[
-        ('Efectivo', 'Efectivo'),
-        ('Transferencia', 'Transferencia')
-    ], validators=[DataRequired()])
+    metodo_pago = SelectField('Método de Pago', choices=[('Efectivo', 'Efectivo'), ('Transferencia', 'Transferencia')], validators=[DataRequired()])
+    comprobante = FileField('Comprobante de Pago (Imagen)', validators=[
+        FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
+    ])
+
     submit = SubmitField('Registrar Pago')
 
 
@@ -64,3 +59,45 @@ class UsuarioForm(FlaskForm):
     password2 = PasswordField('Confirmar Contraseña', validators=[Optional()])
 
     submit = SubmitField('Guardar Usuario')
+
+
+class TipoProductoForm(FlaskForm):
+    nombre = StringField('Nombre del Tipo de Producto', validators=[DataRequired()])
+    submit = SubmitField('Guardar')
+
+
+class AtributoForm(FlaskForm):
+    nombre_atributo = StringField('Nombre del Atributo', validators=[DataRequired()])
+    tipo_campo = SelectField('Tipo de Campo', choices=[
+        ('Texto', 'Texto Corto'),
+        ('Numero', 'Número'),
+        ('Seleccion', 'Lista Desplegable (Selección)')
+    ], validators=[DataRequired()])
+    submit = SubmitField('Añadir Atributo')
+
+
+class OpcionAtributoForm(FlaskForm):
+    valor_opcion = StringField('Nueva Opción', validators=[DataRequired()])
+    submit = SubmitField('Añadir Opción')
+
+
+class EmptyForm(FlaskForm):
+    submit = SubmitField('Submit')
+
+
+class AnularVentaForm(FlaskForm):
+    motivo_anulacion = TextAreaField('Motivo de la Anulación', validators=[DataRequired()])
+    submit = SubmitField('Confirmar Anulación')
+
+
+class ConfiguracionForm(FlaskForm):
+    nombre_tienda = StringField('Nombre de la Tienda', validators=[DataRequired()])
+    logo = FileField('Logo de la Tienda (Opcional)', validators=[
+        FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
+    ])
+    ruc = StringField('RUC')
+    telefono = StringField('Teléfono de Contacto')
+    direccion = StringField('Dirección de la Tienda')
+    email = StringField('Email de Contacto')
+
+    submit = SubmitField('Guardar Configuración')

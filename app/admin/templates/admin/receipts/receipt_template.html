@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo Venta #{{ venta.id }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f9f9f9; }
+        .receipt-box { width: 700px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); font-size: 16px; line-height: 24px; color: #555; background-color: #fff;}
+        .header { text-align: center; padding-bottom: 20px; border-bottom: 2px solid #0d6efd; }
+        .header img { max-width: 200px; max-height: 100px; margin-bottom: 20px; }
+        .header h1 { margin: 0; color: #0d6efd; }
+        .details-box { display: flex; justify-content: space-between; margin-top: 30px; margin-bottom: 30px; }
+        .details-box div { flex-basis: 48%; }
+        table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; }
+        table th { background: #eee; font-weight: bold; padding: 5px; }
+        table td { padding: 5px; border-bottom: 1px solid #eee; }
+        .totals-table { text-align: right; }
+        .totals-table tr.total td { border-bottom: 2px solid #555; font-weight: bold; font-size: 1.2em; }
+        .totals-table tr.balance-due td { color: #d9534f; font-weight: bold; }
+        .section-title { font-size: 1.4em; color: #333; margin-top: 40px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .footer { text-align: center; margin-top: 50px; color: #777; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+<div class="receipt-box">
+    <div class="header">
+        <!-- Mostrar Logo si existe -->
+        {% if tienda_config and tienda_config.logo_path %}
+        <img src="file://{{ logo_path_abs }}" alt="Logo de la Tienda">
+        {% endif %}
+        <!-- Mostrar Nombre de la Tienda dinámicamente -->
+        <h1>{{ tienda_config.nombre_tienda or 'Mi Tienda' }}</h1>
+        <p>Recibo de Venta</p>
+    </div>
+
+    <div class="details-box">
+        <div>
+            <strong>Cliente:</strong><br>
+            {{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}<br>
+            {% if venta.cliente.identificacion %}<strong>ID:</strong> {{ venta.cliente.identificacion }}<br>{% endif %}
+            {% if venta.cliente.direccion %}{{ venta.cliente.direccion }}{% endif %}
+            {% if venta.cliente.ciudad %}<br>{{ venta.cliente.ciudad }}{% endif %}
+        </div>
+        <div>
+            <strong>Venta #:</strong> {{ venta.id }}<br>
+            <strong>Fecha:</strong> {{ venta.fecha_venta.strftime('%Y-%m-%d') }}
+        </div>
+    </div>
+
+    <h2 class="section-title">Detalle de Productos</h2>
+    <table><thead><tr><th>Producto</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
+        <tbody>
+        {% for item in venta.productos_asociados %}
+        <tr><td>{{ item.cantidad }}x {{ item.producto.nombre }}</td><td>@ ${{ "%.2f"|format(item.precio_unitario) }}</td><td style="text-align:right;">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <h2 class="section-title">Historial de Pagos (Letras)</h2>
+    <table><thead><tr><th>Fecha</th><th>Método</th><th style="text-align:right;">Monto</th></tr></thead>
+        <tbody>
+        {% for pago in pagos %}
+        <tr><td>{{ pago.fecha_pago.strftime('%Y-%m-%d') }}</td><td>{{ pago.metodo_pago }}</td><td style="text-align:right;">${{ "%.2f"|format(pago.monto_pago) }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">Sin pagos registrados.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <table class="totals-table" style="margin-top: 40px;">
+        <tr><td>Total Venta:</td><td>${{ "%.2f"|format(venta.monto_total) }}</td></tr>
+        <tr><td>Total Pagado:</td><td>${{ "%.2f"|format(total_pagado) }}</td></tr>
+        <tr class="balance-due"><td>Saldo Pendiente:</td><td>${{ "%.2f"|format(venta.monto_total - total_pagado) }}</td></tr>
+    </table>
+    <div class="footer"><p>¡Gracias por su compra!</p></div>
+</div>
+</body>
+</html>

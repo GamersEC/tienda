@@ -1,0 +1,39 @@
+# Archivos de Docker. 'Dockerfile' es implícitamente ignorado.
+# NO ignorar docker-entrypoint.sh porque es necesario para la imagen.
+docker-compose.yml
+
+# Entorno virtual de Python
+.venv/
+venv/
+env/
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de configuración de IDEs
+.idea/
+.vscode/
+
+# Archivos de Git
+.git/
+.gitignore
+
+# Variables de entorno
+.env
+
+# Archivos generados por la aplicación en tiempo de ejecución
+app/static/receipts/
+app/static/uploads/
+
+# Carpeta de pruebas
+tests/
+test/
+
+# Archivos de base de datos SQLite
+*.sqlite3
+
+# Archivos de registro locales
+*.log

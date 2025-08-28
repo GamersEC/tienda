@@ -3,30 +3,63 @@
 {% block title %}{{ titulo }}{% endblock %}
 
 {% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_clientes') }}">Clientes</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ 'Editar' if 'Editar' in titulo else 'Crear' }}</li>
+    </ol>
+</nav>
+
 <h2>{{ titulo }}</h2>
-<form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            {{ form.nombre.label(class="form-label") }}
-            {{ form.nombre(class="form-control") }}
-        </div>
-        <div class="col-md-6 mb-3">
-            {{ form.apellido.label(class="form-label") }}
-            {{ form.apellido(class="form-control") }}
-        </div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.nombre.label(class="form-label") }}
+                    {{ form.nombre(class="form-control") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.apellido.label(class="form-label") }}
+                    {{ form.apellido(class="form-control") }}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.identificacion.label(class="form-label") }}
+                    {{ form.identificacion(class="form-control") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.telefono.label(class="form-label") }}
+                    {{ form.telefono(class="form-control") }}
+                </div>
+            </div>
+
+            <div class="mb-3">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control") }}
+            </div>
+
+            <hr>
+
+            <div class="mb-3">
+                {{ form.direccion.label(class="form-label") }}
+                {{ form.direccion(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.ciudad.label(class="form-label") }}
+                {{ form.ciudad(class="form-control") }}
+            </div>
+
+            <div class="mt-4">
+                {{ form.submit(class="btn btn-success") }}
+                <a href="{{ url_for('admin.listar_clientes') }}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
     </div>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            {{ form.telefono.label(class="form-label") }}
-            {{ form.telefono(class="form-control") }}
-        </div>
-        <div class="col-md-6 mb-3">
-            {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control") }}
-        </div>
-    </div>
-    {{ form.submit(class="btn btn-success") }}
-    <a href="{{ url_for('admin.listar_clientes') }}" class="btn btn-secondary">Cancelar</a>
-</form>
+</div>
 {% endblock %}

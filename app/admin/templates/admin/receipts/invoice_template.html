@@ -1,0 +1,230 @@
+--- START OF FILE invoice_template.html ---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura Venta #{{ venta.id }}</title>
+    <style>
+        /* Reset y configuración base */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            -webkit-print-color-adjust: exact; /* Asegura que los colores se impriman como se ven */
+        }
+
+        /* Contenedor principal de la factura */
+        .invoice-container {
+            position: relative;
+            width: 780px; /* Ancho ligeramente ajustado */
+            margin: 30px auto; /* Márgenes exteriores */
+            padding: 35px; /* Relleno interior */
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Sombra más sutil */
+            font-size: 14px; /* Fuente ligeramente más pequeña */
+            line-height: 1.6; /* Espaciado de línea */
+            color: #333;
+            background-color: #fff;
+        }
+
+        /* Encabezado de la factura */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start; /* Alineación al inicio para evitar que el logo se estire */
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Línea inferior más fina */
+            margin-bottom: 25px;
+        }
+        .header .logo {
+            max-width: 150px; /* Tamaño máximo del logo */
+            height: auto; /* Mantiene la proporción */
+            vertical-align: middle; /* Alineación para evitar espacios extra */
+        }
+        .header .company-info {
+            text-align: right;
+        }
+        .header .company-info h1 {
+            margin: 0;
+            color: #007bff;
+            font-size: 2.2em; /* Tamaño de fuente ajustado */
+            font-weight: 700;
+        }
+        .header .company-info p {
+            margin: 0;
+            font-size: 1em;
+            color: #555;
+        }
+
+        /* Detalles de la factura (cliente, fechas) */
+        .invoice-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            font-size: 0.95em; /* Un poco más pequeño */
+        }
+        .invoice-details div {
+            flex-basis: 49%; /* Distribución casi equitativa */
+        }
+        .invoice-details strong {
+            color: #007bff;
+            display: block;
+            margin-bottom: 3px;
+            font-weight: 600; /* Ligeramente menos negrita */
+        }
+        .invoice-details span {
+            display: block;
+        }
+
+        /* Títulos de sección */
+        .section-title {
+            font-size: 1.4em; /* Más pequeño */
+            color: #007bff;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0; /* Línea más fina */
+            padding-bottom: 6px;
+            font-weight: 600;
+        }
+
+        /* Tabla de productos */
+        table {
+            width: 100%;
+            text-align: left;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        table thead th {
+            background: #f8f8f8; /* Fondo más claro */
+            font-weight: 600;
+            padding: 10px 8px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table tbody td {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0; /* Borde más sutil */
+            font-size: 0.9em;
+        }
+        table tbody tr:nth-child(even) {
+            background-color: #fcfcfc; /* Franjas más claras */
+        }
+
+        /* Tabla de totales */
+        .totals-table {
+            width: 280px; /* Ancho fijo para la tabla de totales */
+            margin-left: auto;
+            text-align: right;
+            border: 1px solid #e0e0e0; /* Añadir un borde para destacarla */
+            border-radius: 4px;
+        }
+        .totals-table tr td {
+            padding: 8px 10px;
+            border-bottom: none;
+        }
+        .totals-table tr.total td {
+            font-weight: 700;
+            font-size: 1.2em; /* Un poco más pequeño */
+            color: #007bff;
+            border-top: 1px solid #007bff; /* Borde más fino */
+            padding-top: 10px;
+            background-color: #eaf5ff; /* Fondo para el total */
+        }
+
+        /* Pie de página */
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            color: #777;
+            font-size: 0.9em;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        /* Sello de pagado */
+        .paid-stamp {
+            position: absolute;
+            top: 120px; /* Posición ajustada */
+            right: 40px; /* Posición ajustada */
+            border: 3px solid #28a745; /* Borde más fino */
+            color: #28a745;
+            font-size: 48px; /* Tamaño de fuente ajustado */
+            font-weight: bold;
+            padding: 10px 20px;
+            opacity: 0.15; /* Menos opaco para ser más sutil */
+            transform: rotate(-25deg); /* Rotación ligeramente menor */
+            z-index: 1000;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+<div class="invoice-container">
+    <div class="paid-stamp">PAGADO</div>
+
+    <div class="header">
+        <div class="logo-box">
+            {% if logo_path_abs %}
+            <img src="file://{{ logo_path_abs }}" alt="Logo de la Tienda" class="logo">
+            {% endif %}
+        </div>
+        <div class="company-info">
+            <h1>{{ tienda_config.nombre_tienda or 'Mi Tienda' }}</h1>
+            <p>Factura de Venta</p>
+        </div>
+    </div>
+
+    <div class="invoice-details">
+        <div>
+            <strong>FACTURA PARA:</strong>
+            <span>{{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</span>
+            {% if venta.cliente.identificacion %}<span>ID: {{ venta.cliente.identificacion }}</span>{% endif %}
+            {% if venta.cliente.direccion %}<span>{{ venta.cliente.direccion }}</span>{% endif %}
+            {% if venta.cliente.ciudad %}<span>{{ venta.cliente.ciudad }}</span>{% endif %}
+        </div>
+        <div style="text-align: right;">
+            <strong>FACTURA #:</strong>
+            <span>{{ venta.id }}</span>
+            <strong>FECHA DE PAGO:</strong>
+            <span>{{ pagos[-1].fecha_pago.strftime('%Y-%m-%d') if pagos else venta.fecha_venta.strftime('%Y-%m-%d') }}</span>
+        </div>
+    </div>
+
+    <h2 class="section-title">Detalle de Productos</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Producto</th>
+            <th style="text-align:right;">Precio Unitario</th>
+            <th style="text-align:right;">Cantidad</th>
+            <th style="text-align:right;">Subtotal</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in venta.productos_asociados %}
+        <tr>
+            <td>{{ item.producto.nombre }}</td>
+            <td style="text-align:right;">${{ "%.2f"|format(item.precio_unitario) }}</td>
+            <td style="text-align:right;">{{ item.cantidad }}</td>
+            <td style="text-align:right;">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals-table">
+        <tr><td>SUBTOTAL:</td><td>${{ "%.2f"|format(venta.monto_total) }}</td></tr>
+        <tr class="total"><td>TOTAL PAGADO:</td><td>${{ "%.2f"|format(venta.monto_total) }}</td></tr>
+    </table>
+
+    <div class="footer">
+        <p>¡Gracias por su compra! Esperamos verte de nuevo.</p>
+        <p>{{ tienda_config.nombre_tienda or 'Mi Tienda' }} &copy; {{ now.year }}</p>
+    </div>
+</div>
+</body>
+</html>

@@ -1,26 +1,29 @@
 {% extends "admin/base_admin.html" %}
 
-{% block title %}Editando Venta #{{ venta.id }}{% endblock %}
+{% block title %}Registrando Venta #{{ venta.id }}{% endblock %}
 
 {% block content %}
-<h2>Editando Venta #{{ venta.id }} para {{ venta.cliente.nombre }}</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Registrando Venta #{{ venta.id }}</h2>
+    <span class="fs-5 text-muted">Cliente: {{ venta.cliente.nombre }}</span>
+</div>
 <hr>
 
 <div class="row g-4">
     <!-- Columna Izquierda: Productos en la Venta y Notas -->
     <div class="col-md-7">
-        <div class="card">
-            <div class="card-header">
-                <h4>Productos en esta Venta</h4>
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">Productos en esta Venta</h4>
             </div>
-            <div class="card-body">
-                <table class="table">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
                     <thead>
                     <tr>
                         <th>Producto</th>
                         <th>Cantidad</th>
                         <th class="text-end">Subtotal</th>
-                        <th></th>
+                        <th class="text-end">Quitar</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -31,17 +34,18 @@
                         <td class="text-end">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
                         <td class="text-end">
                             <form action="{{ url_for('admin.eliminar_producto_venta', venta_id=venta.id, producto_asociado_id=item.id) }}" method="post">
+                                {{ agregar_producto_form.hidden_tag() }} <!-- Token CSRF -->
                                 <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Quitar este producto?');">&times;</button>
                             </form>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4">Aún no hay productos en esta venta.</td></tr>
+                    <tr><td colspan="4" class="text-center p-4">Aún no hay productos en esta venta.</td></tr>
                     {% endfor %}
                     </tbody>
                     <tfoot>
-                    <tr>
-                        <th colspan="2" class="text-end fs-5">Total:</th>
+                    <tr class="table-light">
+                        <th colspan="2" class="text-end fs-5">Total Venta:</th>
                         <th class="text-end fs-5">${{ "%.2f"|format(venta.monto_total) }}</th>
                         <th></th>
                     </tr>
@@ -50,12 +54,12 @@
             </div>
         </div>
 
-        <div class="card mt-4">
-            <div class="card-header"><h4>Notas Adicionales</h4></div>
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-white"><h4 class="mb-0">Notas Adicionales</h4></div>
             <div class="card-body">
                 <form method="post" novalidate>
                     {{ editar_venta_form.hidden_tag() }}
-                    {{ editar_venta_form.notas(class="form-control", rows=3) }}
+                    {{ editar_venta_form.notas(class="form-control", rows=3, placeholder="Añadir detalles, acuerdos, etc.") }}
                     <button type="submit" name="submit_notas" value="guardar" class="btn btn-secondary mt-2">Guardar Notas</button>
                 </form>
             </div>
@@ -64,29 +68,100 @@
 
     <!-- Columna Derecha: Añadir Producto y Finalizar -->
     <div class="col-md-5">
-        <div class="card">
-            <div class="card-header"><h4>Añadir Producto</h4></div>
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white"><h4 class="mb-0">Añadir Producto</h4></div>
             <div class="card-body">
-                <form method="post" novalidate>
+                <form method="post" novalidate id="add-product-form">
                     {{ agregar_producto_form.hidden_tag() }}
                     <div class="mb-3">
                         {{ agregar_producto_form.producto.label(class="form-label") }}
                         {{ agregar_producto_form.producto(class="form-select") }}
+                        <!-- AQUÍ SE MOSTRARÁ EL STOCK -->
+                        <div id="stock-info" class="form-text text-success fw-bold mt-2"></div>
                     </div>
                     <div class="mb-3">
                         {{ agregar_producto_form.cantidad.label(class="form-label") }}
                         {{ agregar_producto_form.cantidad(class="form-control") }}
                     </div>
-                    <button type="submit" name="submit_producto" value="agregar" class="btn btn-primary w-100">Añadir Producto</button>
+                    <div class="d-grid">
+                        <button type="submit" name="submit_producto" value="agregar" class="btn btn-primary btn-lg">Añadir Producto a Venta</button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <div class="d-grid gap-2 mt-4">
             <form action="{{ url_for('admin.finalizar_venta', id=venta.id) }}" method="post">
+                {{ agregar_producto_form.hidden_tag() }}
                 <button type="submit" class="btn btn-success btn-lg w-100">Finalizar y Proceder a Pagos</button>
+            </form>
+
+            <!-- === SECCIÓN DE ANULAR VENTA (SOLO PARA ADMINS) === -->
+            {% if current_user.is_admin %}
+            <button type="button" class="btn btn-outline-danger w-100 mt-2" data-bs-toggle="modal" data-bs-target="#anularVentaModal">
+                Anular Venta
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- === MODAL PARA CONFIRMAR ANULACIÓN === -->
+{% if current_user.is_admin %}
+<div class="modal fade" id="anularVentaModal" tabindex="-1" aria-labelledby="anularVentaModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="anularVentaModalLabel">Anular Venta #{{ venta.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('admin.anular_venta', id=venta.id) }}" method="post" novalidate>
+                <div class="modal-body">
+                    {% set anular_form = anular_venta_form or none %}
+                    {% if anular_form %}
+                    {{ anular_form.hidden_tag() }}
+                    <p><strong>¡Atención!</strong> Esta acción es irreversible. El stock de los productos será devuelto al inventario.</p>
+                    <div class="mb-3">
+                        {{ anular_form.motivo_anulacion.label(class="form-label") }}
+                        {{ anular_form.motivo_anulacion(class="form-control", rows=3, required=true) }}
+                    </div>
+                    {% else %}
+                    <p class="text-danger">Error: No se pudo cargar el formulario de anulación.</p>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    {% if anular_form %}{{ anular_form.submit(class="btn btn-danger") }}{% endif %}
+                </div>
             </form>
         </div>
     </div>
 </div>
+{% endif %}
+<!-- === FIN DEL MODAL === -->
+
+<!-- === JAVASCRIPT PARA MOSTRAR STOCK === -->
+<script>
+    // Obtenemos los datos de stock que pasamos desde Python
+    const stockData = {{ stock_data | tojson | safe }};
+
+    const productSelect = document.getElementById('producto');
+    const stockInfoDiv = document.getElementById('stock-info');
+
+    function updateStockInfo() {
+        const selectedProductId = productSelect.value;
+        if (selectedProductId && stockData[selectedProductId]) {
+            const stock = stockData[selectedProductId];
+            stockInfoDiv.textContent = `Stock disponible: ${stock} unidades`;
+        } else {
+            stockInfoDiv.textContent = '';
+        }
+    }
+
+    // Mostrar el stock del producto seleccionado al cargar la página
+    document.addEventListener('DOMContentLoaded', updateStockInfo);
+
+    // Actualizar el stock cada vez que el usuario cambia de producto
+    productSelect.addEventListener('change', updateStockInfo);
+</script>
 {% endblock %}

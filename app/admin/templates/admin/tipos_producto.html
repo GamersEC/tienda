@@ -1,0 +1,34 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Gestionar Tipos de Producto{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Tipos de Producto</h2>
+    <a href="{{ url_for('admin.crear_tipo_producto') }}" class="btn btn-primary">Añadir Nuevo Tipo</a>
+</div>
+<div class="card">
+    <div class="card-body">
+        <ul class="list-group list-group-flush">
+            {% for tipo in tipos %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ url_for('admin.detalle_tipo_producto', id=tipo.id) }}" class="fs-5 text-decoration-none">{{ tipo.nombre }}</a>
+                    <br>
+                    <small class="text-muted">{{ tipo.atributos.count() }} atributo(s) definido(s)</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.editar_tipo_producto', id=tipo.id) }}" class="btn btn-sm btn-outline-primary">Renombrar</a>
+                    <form action="{{ url_for('admin.eliminar_tipo_producto', id=tipo.id) }}" method="post" class="d-inline ms-1">
+                        {{ form.hidden_tag() if form }} <!-- Token CSRF -->
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Estás seguro?');">Eliminar</button>
+                    </form>
+                </div>
+            </li>
+            {% else %}
+            <li class="list-group-item text-center p-4">No hay tipos de producto definidos.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

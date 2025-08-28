@@ -2,7 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect  # <-- 1. AÑADIR ESTA IMPORTACIÓN
+from flask_wtf.csrf import CSRFProtect
 from config import Config
 
 # -----------------------------------------------------------
@@ -11,7 +11,7 @@ from config import Config
 
 db = SQLAlchemy()
 migrate = Migrate()
-csrf = CSRFProtect()  # <-- 2. CREAR LA INSTANCIA DE CSRFPROTECT
+csrf = CSRFProtect()
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 login_manager.login_message = 'Por favor, inicie sesión para acceder a esta página.'
@@ -44,10 +44,16 @@ def create_app(config_class=Config):
     from app import commands
     commands.init_app(app)
 
+    from . import context_processors
+    app.context_processor(context_processors.inject_config)
+
     # -----------------------------------------------------------
     # Importar modelos al final
     # -----------------------------------------------------------
-    from app.models import producto, cliente, venta, pago, venta_producto, usuario
+    from app.models import (
+        producto, cliente, venta, pago, venta_producto, usuario,
+        tipo_producto, atributo, valor_atributo_producto, configuracion
+    )
 
     return app
 

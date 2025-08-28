@@ -1,0 +1,44 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Seleccionar Tipo de Producto{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_productos') }}">Productos</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Añadir Nuevo Producto</li>
+    </ol>
+</nav>
+
+<h2>Añadir Nuevo Producto (Paso 1 de 2)</h2>
+<p class="lead">Selecciona qué tipo de producto quieres crear.</p>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" novalidate>
+            <!-- Esta línea es crucial para la seguridad CSRF -->
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+                <label for="tipo_producto" class="form-label fs-5">Tipo de Producto</label>
+                <select class="form-select form-select-lg" name="tipo_producto" id="tipo_producto" required>
+                    <option value="" disabled selected>-- Elige una opción --</option>
+                    {% for tipo in tipos %}
+                    <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg">Siguiente: Añadir Detalles</button>
+            <a href="{{ url_for('admin.listar_productos') }}" class="btn btn-secondary btn-lg">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+<div class="mt-3">
+    <small class="text-muted">
+        ¿No encuentras el tipo que buscas?
+        <a href="{{ url_for('admin.listar_tipos_producto') }}">Puedes definir nuevos tipos de producto aquí.</a>
+    </small>
+</div>
+{% endblock %}
