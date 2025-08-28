@@ -168,8 +168,8 @@
 
     <div class="header">
         <div class="logo-box">
-            {% if logo_path_abs %}
-            <img src="file://{{ logo_path_abs }}" alt="Logo de la Tienda" class="logo">
+            {% if logo_data_url %}
+            <img src="{{ logo_data_url }}" alt="Logo de la Tienda" class="logo">
             {% endif %}
         </div>
         <div class="company-info">

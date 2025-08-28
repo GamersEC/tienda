@@ -1,4 +1,5 @@
 import os
+import base64
 from flask import render_template, redirect, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, or_
@@ -477,6 +478,52 @@ def anular_venta(id):
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA GENERACIÓN DE IMÁGENES ---
 # -----------------------------------------------------------------------------
+
+def _obtener_logo_data_url(config):
+    """
+    Convierte el logo a una data URL para uso en Playwright.
+    Esto es más confiable que usar file:// URLs.
+    """
+    if not config or not config.logo_path:
+        return None
+        
+    logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
+    
+    if not os.path.exists(logo_abs_path):
+        current_app.logger.error(f"Logo file not found: {logo_abs_path}")
+        return None
+    
+    try:
+        with open(logo_abs_path, 'rb') as f:
+            logo_data = f.read()
+        
+        # Detectar tipo de archivo por extensión
+        _, ext = os.path.splitext(logo_abs_path)
+        ext = ext.lower()
+        
+        if ext in ['.jpg', '.jpeg']:
+            mime_type = 'image/jpeg'
+        elif ext == '.png':
+            mime_type = 'image/png'
+        elif ext == '.gif':
+            mime_type = 'image/gif'
+        elif ext in ['.webp']:
+            mime_type = 'image/webp'
+        else:
+            # Default to png para compatibilidad
+            mime_type = 'image/png'
+        
+        # Crear data URL
+        base64_data = base64.b64encode(logo_data).decode('utf-8')
+        data_url = f"data:{mime_type};base64,{base64_data}"
+        
+        current_app.logger.info(f"Logo converted to data URL successfully. File: {logo_abs_path}")
+        return data_url
+        
+    except Exception as e:
+        current_app.logger.error(f"Error converting logo to data URL: {e}")
+        return None
+
 def _generar_imagen_playwright(html_string, output_path):
     with sync_playwright() as p:
         # Lanza Chromium con un argumento para permitir el acceso a archivos locales.
@@ -485,11 +532,18 @@ def _generar_imagen_playwright(html_string, output_path):
         page = browser.new_page()
         page.set_viewport_size({"width": 800, "height": 1200})
         page.set_content(html_string, wait_until='networkidle') # Añadido wait_until para mayor robustez
-        # Asegúrate de que el selector es correcto para tu factura/recibo.
-        # En tu invoice_template.html usas '.invoice-container'
-        # Si receipt_template.html usa '.receipt-box', entonces necesitarías una lógica condicional
-        # o renombrar la clase principal en receipt_template.html a .invoice-container también.
-        page.locator('.invoice-container').screenshot(path=output_path)
+        
+        # Detectar qué tipo de template estamos usando y usar el selector apropiado
+        if 'class="invoice-container"' in html_string:
+            # Plantilla de factura
+            page.locator('.invoice-container').screenshot(path=output_path)
+        elif 'class="receipt-box"' in html_string:
+            # Plantilla de recibo
+            page.locator('.receipt-box').screenshot(path=output_path)
+        else:
+            # Fallback: tomar screenshot de todo el body
+            page.locator('body').screenshot(path=output_path)
+        
         browser.close()
 
 @bp.route('/ventas/<int:id>/generar_recibo')
@@ -500,15 +554,8 @@ def generar_recibo_venta(id):
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
 
-    logo_abs_path = None
-    if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-RECIBO: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-RECIBO: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-RECIBO: El archivo del logo EXISTE en: {logo_abs_path}")
+    # Usar data URL para el logo en lugar de file:// URL
+    logo_data_url = _obtener_logo_data_url(config)
 
     html_out = render_template(
         'admin/receipts/receipt_template.html',
@@ -516,7 +563,7 @@ def generar_recibo_venta(id):
         total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_path_abs=logo_abs_path
+        logo_data_url=logo_data_url
     )
 
     receipts_dir = os.path.join(current_app.static_folder, 'receipts')
@@ -550,15 +597,8 @@ def generar_factura_venta(id):
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
 
-    logo_abs_path = None
-    if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-FACTURA: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-FACTURA: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-FACTURA: El archivo del logo EXISTE en: {logo_abs_path}")
+    # Usar data URL para el logo en lugar de file:// URL
+    logo_data_url = _obtener_logo_data_url(config)
 
     html_out = render_template(
         'admin/receipts/invoice_template.html',
@@ -566,7 +606,7 @@ def generar_factura_venta(id):
         total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_path_abs=logo_abs_path,
+        logo_data_url=logo_data_url,
         now=datetime.utcnow()
     )
 
