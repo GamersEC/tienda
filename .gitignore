@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# PyCharm files
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Local instance folder
+instance/
+*.sqlite
+
+# Other
+.env
