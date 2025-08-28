@@ -1,31 +1,47 @@
-# 1. Usar la imagen oficial de Playwright, que ya tiene navegadores y dependencias
-FROM mcr.microsoft.com/playwright/python:v1.37.0-focal
+# 1. Usar una imagen oficial de Python, ligera y optimizada (basada en Debian)
+FROM python:3.12-slim-bookworm
 
-# 2. Establece variables de entorno
+# 2. Establecer variables de entorno para un funcionamiento óptimo de Python
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONPATH /app
 
-# 3. Establecer el directorio de trabajo
+# 3. Actualizar el sistema e instalar dependencias
+# Se instalan dependencias para WeasyPrint, psycopg2 Y pdf2image
+RUN apt-get update && apt-get install -y \
+    # Dependencias de WeasyPrint
+    libpango-1.0-0 \
+    libharfbuzz0b \
+    libpangoft2-1.0-0 \
+    # Dependencias para compilar psycopg2
+    gcc \
+    python3-dev \
+    libpq-dev \
+    # Dependencia para pdf2image
+    poppler-utils \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+# 4. Establecer el directorio de trabajo
 WORKDIR /app
 
-# 4. Copiar e instalar las dependencias de Python
-# La imagen base ya tiene Playwright, pip instalará el resto
+# 5. Copiar e instalar las dependencias de Python
+# Se copia solo requirements.txt primero para aprovechar el caché de Docker
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copiar el resto del código de la aplicación
+# 6. Copiar el resto del código de la aplicación
 COPY . .
 
-# 6. Copia el entrypoint y dale permisos
+# 7. Copia el entrypoint y dale permisos de ejecución
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# 7. Exponer el puerto
+# 8. Exponer el puerto que usará Gunicorn
 EXPOSE 5000
 
-# 8. Define el entrypoint
+# 9. Define el entrypoint que se ejecutará al iniciar el contenedor
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# 9. Comando por defecto
+# 10. Comando por defecto que se pasa al entrypoint
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "manage:app"]

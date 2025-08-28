@@ -172,7 +172,7 @@
                         <div class="mb-3" id="comprobante_field" style="display: none;">
                             {{ pago_form.comprobante.label(class="form-label fw-bold") }}
                             {{ pago_form.comprobante(class="form-control") }}
-                            <div class="form-text">Formatos permitidos: JPG, PNG, PDF (Máx. 5MB)</div>
+                            <div class="form-text">Formatos permitidos: JPG, PNG.</div>
                         </div>
                         <div class="d-grid">
                             {{ pago_form.submit(class="btn btn-primary btn-lg") }}
@@ -197,7 +197,6 @@
                                     <small class="text-muted">{{ pago.fecha_pago.strftime('%Y-%m-%d %H:%M') }}</small>
                                 </div>
                                 <div class="text-end">
-                                    <!-- === LA ÚNICA LÍNEA CORREGIDA === -->
                                     <span class="badge bg-light text-dark">{{ pago.metodo_pago }}</span>
                                     {% if pago.comprobante_path %}
                                     <a href="{{ url_for('static', filename=pago.comprobante_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary ms-1">
@@ -227,7 +226,7 @@
         </a>
         <div>
             <a href="{{ url_for('admin.generar_recibo_venta', id=venta.id) }}" class="btn btn-outline-primary">
-                <i class="fas fa-file-alt me-2"></i> Estado de Cuenta
+                <i class="fas fa-file-alt me-2"></i> Recibo / Estado de Cuenta
             </a>
             {% if venta.estado == 'Pagada' %}
             <a href="{{ url_for('admin.generar_factura_venta', id=venta.id) }}" class="btn btn-primary ms-2">
@@ -237,19 +236,22 @@
         </div>
     </div>
 
-    {% set generated_image_url = request.args.get('generated_image_url') %}
-    {% if generated_image_url %}
+    <!-- Vista Previa del Recibo Generado -->
+    {% if request.args.get('generated_image_url') and request.args.get('v') %}
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0"><i class="fas fa-receipt me-2 text-primary"></i> Vista Previa del Recibo</h5>
         </div>
         <div class="card-body text-center">
-            <a href="{{ generated_image_url }}" target="_blank">
-                <img src="{{ generated_image_url }}" class="img-fluid rounded border shadow-sm" alt="Vista previa del recibo" style="max-height: 400px;">
+            {# Creamos la URL completa uniendo los dos parámetros #}
+            {% set full_image_url = request.args.get('generated_image_url') + '?v=' + request.args.get('v') %}
+
+            <a href="{{ full_image_url }}" target="_blank">
+                <img src="{{ full_image_url }}" class="img-fluid rounded border shadow-sm" alt="Vista previa del recibo" style="max-height: 400px;">
             </a>
             <p class="mt-3 mb-3 text-muted">Haz clic en la imagen para verla en tamaño completo.</p>
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                <a href="{{ generated_image_url }}" download="recibo-venta-{{ venta.id }}.png" class="btn btn-success">
+                <a href="{{ full_image_url }}" download="recibo-venta-{{ venta.id }}.png" class="btn btn-success">
                     <i class="fas fa-download me-2"></i> Descargar
                 </a>
                 <button id="share-button" class="btn btn-primary">
@@ -259,6 +261,7 @@
         </div>
     </div>
     {% endif %}
+
 </div>
 
 <script>
@@ -267,20 +270,25 @@
         const comprobanteField = document.getElementById('comprobante_field');
         if (metodoSelect) {
             function toggleComprobanteField() {
-                comprobanteField.style.display = metodoSelect.value === 'Transferencia' ? 'block' : 'none';
+                if (comprobanteField) {
+                    comprobanteField.style.display = metodoSelect.value === 'Transferencia' ? 'block' : 'none';
+                }
             }
             metodoSelect.addEventListener('change', toggleComprobanteField);
             toggleComprobanteField();
         }
 
         const shareButton = document.getElementById('share-button');
-        const imageUrl = "{{ generated_image_url or '' }}";
+        // Reconstruimos la URL completa en JavaScript a partir de los parámetros
+        const imageUrlBase = "{{ request.args.get('generated_image_url') or '' }}";
+        const imageTimestamp = "{{ request.args.get('v') or '' }}";
+        const fullImageUrl = imageUrlBase && imageTimestamp ? `${imageUrlBase}?v=${imageTimestamp}` : '';
         const fileName = "recibo-venta-{{ venta.id }}.png";
 
-        if (shareButton && navigator.share) {
+        if (shareButton && navigator.share && fullImageUrl) {
             shareButton.addEventListener('click', async () => {
                 try {
-                    const response = await fetch(imageUrl);
+                    const response = await fetch(fullImageUrl);
                     const blob = await response.blob();
                     const file = new File([blob], fileName, { type: blob.type });
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {

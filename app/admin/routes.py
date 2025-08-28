@@ -2,12 +2,13 @@ import os
 from flask import render_template, redirect, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, or_
-from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import uuid
 from math import isclose
 from decimal import Decimal
+from weasyprint import HTML, CSS
+from pdf2image import convert_from_bytes
 
 # Importaciones de WTForms
 from flask_wtf import FlaskForm
@@ -474,23 +475,19 @@ def anular_venta(id):
 
     return redirect(url_for('admin.listar_ventas'))
 
-# -----------------------------------------------------------------------------
-# --- RUTAS PARA GENERACIÓN DE IMÁGENES ---
-# -----------------------------------------------------------------------------
-def _generar_imagen_playwright(html_string, output_path):
-    with sync_playwright() as p:
-        # Lanza Chromium con un argumento para permitir el acceso a archivos locales.
-        # Esto es crucial para URLs tipo 'file://'
-        browser = p.chromium.launch(args=['--allow-file-access-from-files'])
-        page = browser.new_page()
-        page.set_viewport_size({"width": 800, "height": 1200})
-        page.set_content(html_string, wait_until='networkidle') # Añadido wait_until para mayor robustez
-        # Asegúrate de que el selector es correcto para tu factura/recibo.
-        # En tu invoice_template.html usas '.invoice-container'
-        # Si receipt_template.html usa '.receipt-box', entonces necesitarías una lógica condicional
-        # o renombrar la clase principal en receipt_template.html a .invoice-container también.
-        page.locator('.invoice-container').screenshot(path=output_path)
-        browser.close()
+def _generar_imagen_weasyprint(html_string, output_path):
+    # reamos un objeto HTML con el contenido y la URL base para encontrar imágenes.
+    base_url = request.url_root
+    html_doc = HTML(string=html_string, base_url=base_url)
+
+    #Convertir el HTML a un PDF en la memoria RAM (como bytes).
+    pdf_in_memory = html_doc.write_pdf()
+
+    #Usar pdf2image para convertir esos bytes de PDF a una imagen.
+    images = convert_from_bytes(pdf_in_memory)
+    if images:
+        #Guardamos la primera (y única) imagen en la ruta de salida con formato PNG.
+        images[0].save(output_path, 'PNG')
 
 @bp.route('/ventas/<int:id>/generar_recibo')
 @login_required
@@ -499,44 +496,37 @@ def generar_recibo_venta(id):
     pagos = venta.pagos.order_by(Pago.fecha_pago.asc()).all()
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
-
-    logo_abs_path = None
+    logo_url = None
     if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-RECIBO: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-RECIBO: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-RECIBO: El archivo del logo EXISTE en: {logo_abs_path}")
-
+        logo_url = url_for('static', filename=config.logo_path, _external=True)
     html_out = render_template(
         'admin/receipts/receipt_template.html',
         venta=venta,
         total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_path_abs=logo_abs_path
+        logo_url=logo_url
     )
-
     receipts_dir = os.path.join(current_app.static_folder, 'receipts')
     os.makedirs(receipts_dir, exist_ok=True)
     filename = f'recibo_venta_{venta.id}.png'
     filepath = os.path.join(receipts_dir, filename)
-
     try:
-        # Llamar a la función auxiliar
-        _generar_imagen_playwright(html_out, filepath)
-
+        _generar_imagen_weasyprint(html_out, filepath)
     except Exception as e:
         flash(f'Error al generar la imagen del recibo: {e}', 'danger')
         current_app.logger.error(f"Error en generar_recibo_venta: {e}", exc_info=True)
         return redirect(url_for('admin.ver_venta', id=id))
 
     flash('¡Recibo en imagen generado exitosamente!', 'success')
-    image_url = url_for('static', filename=os.path.join('receipts', filename))
-    return redirect(url_for('admin.ver_venta', id=id, generated_image_url=image_url))
 
+    image_path = url_for('static', filename=os.path.join('receipts', filename))
+    timestamp = datetime.utcnow().timestamp()
+
+    #Construimos la URL de destino a mano para asegurar el formato correcto
+    destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
+
+    return redirect(destination_url)
 
 @bp.route('/ventas/<int:id>/generar_factura')
 @login_required
@@ -545,48 +535,39 @@ def generar_factura_venta(id):
     if venta.estado != 'Pagada':
         flash('Solo se pueden generar facturas finales para ventas pagadas.', 'warning')
         return redirect(url_for('admin.ver_venta', id=id))
-
     pagos = venta.pagos.order_by(Pago.fecha_pago.asc()).all()
-    total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
-
-    logo_abs_path = None
+    logo_url = None
     if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-FACTURA: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-FACTURA: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-FACTURA: El archivo del logo EXISTE en: {logo_abs_path}")
-
+        logo_url = url_for('static', filename=config.logo_path, _external=True)
     html_out = render_template(
         'admin/receipts/invoice_template.html',
         venta=venta,
-        total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_path_abs=logo_abs_path,
+        logo_url=logo_url,
         now=datetime.utcnow()
     )
-
     receipts_dir = os.path.join(current_app.static_folder, 'receipts')
     os.makedirs(receipts_dir, exist_ok=True)
     filename = f'factura_venta_{venta.id}.png'
     filepath = os.path.join(receipts_dir, filename)
-
     try:
-        # Llamar a la función auxiliar
-        _generar_imagen_playwright(html_out, filepath)
-
+        _generar_imagen_weasyprint(html_out, filepath)
     except Exception as e:
         flash(f'Error al generar la imagen de la factura: {e}', 'danger')
         current_app.logger.error(f"Error en generar_factura_venta: {e}", exc_info=True)
         return redirect(url_for('admin.ver_venta', id=id))
 
     flash('¡Factura final generada exitosamente!', 'success')
-    image_url = url_for('static', filename=os.path.join('receipts', filename))
-    return redirect(url_for('admin.ver_venta', id=id, generated_image_url=image_url))
+
+    image_path = url_for('static', filename=os.path.join('receipts', filename))
+    timestamp = datetime.utcnow().timestamp()
+
+    #Construimos la URL de destino a mano para asegurar el formato correcto
+    destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
+
+    return redirect(destination_url)
 
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA GESTIÓN DE USUARIOS ---

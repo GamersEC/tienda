@@ -25,8 +25,8 @@
 <div class="receipt-box">
     <div class="header">
         <!-- Mostrar Logo si existe -->
-        {% if tienda_config and tienda_config.logo_path %}
-        <img src="file://{{ logo_path_abs }}" alt="Logo de la Tienda">
+        {% if logo_url %}
+        <img src="{{ logo_url }}" alt="Logo de la Tienda">
         {% endif %}
         <!-- Mostrar Nombre de la Tienda dinámicamente -->
         <h1>{{ tienda_config.nombre_tienda or 'Mi Tienda' }}</h1>
