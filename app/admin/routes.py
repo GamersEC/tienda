@@ -2,24 +2,25 @@ import os
 from flask import render_template, redirect, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, or_
-from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import uuid
 from math import isclose
 from decimal import Decimal
+from weasyprint import HTML, CSS
+from pdf2image import convert_from_bytes
 
-# Importaciones de WTForms
+#Importaciones de WTForms
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SelectField
 from wtforms.validators import DataRequired, NumberRange
 
-# Importaciones locales
+#Importaciones locales
 from app import db
 from app.admin import bp
 from app.utils.decorators import admin_required
 
-# --- Importación de todos los Modelos ---
+#Importación de todos los Modelos
 from app.models.producto import Producto
 from app.models.cliente import Cliente
 from app.models.venta import Venta
@@ -31,7 +32,7 @@ from app.models.atributo import Atributo, OpcionAtributo
 from app.models.valor_atributo_producto import ValorAtributoProducto
 from app.models.configuracion import Configuracion
 
-# --- Importación de todos los Formularios ---
+#Importación de todos los Formularios
 from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
@@ -42,7 +43,7 @@ from app.admin.forms import (
 @bp.route('/configuracion', methods=['GET', 'POST'])
 @admin_required
 def configuracion_tienda():
-    # Obtenemos la primera (y única) fila de configuración, o creamos una si no existe
+    #Obtenemos la primera fila de configuración, o creamos una si no existe
     config = Configuracion.obtener_config()
     if not config:
         config = Configuracion()
@@ -79,8 +80,8 @@ def configuracion_tienda():
 @bp.before_request
 @login_required
 def before_request():
-    """Protege todas las rutas de este blueprint, requiriendo que el usuario inicie sesión."""
     pass
+
 
 # -----------------------------------------------------------------------------
 # --- RUTA PRINCIPAL DEL DASHBOARD ---
@@ -88,21 +89,20 @@ def before_request():
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    # --- Consultas para las estadísticas ---
-
-    # 1. Ventas de Hoy
+    #Consultas para las estadísticas
+    #Ventas de Hoy
     hoy_inicio = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     ventas_hoy = Venta.query.filter(Venta.fecha_venta >= hoy_inicio).count()
     ingresos_hoy = db.session.query(func.sum(Venta.monto_total)).filter(Venta.fecha_venta >= hoy_inicio).scalar() or 0
 
-    # 2. Total de Clientes y Productos
+    #Total de Clientes y Productos
     total_clientes = Cliente.query.count()
     total_productos = Producto.query.count()
 
-    # 3. Productos con bajo stock (ej. 5 o menos unidades)
+    #Productos con bajo stock
     productos_bajo_stock = Producto.query.filter(Producto.stock <= 5).order_by(Producto.stock.asc()).limit(5).all()
 
-    # 4. Últimas 5 ventas registradas
+    #Últimas 5 ventas registradas
     ultimas_ventas = Venta.query.order_by(Venta.fecha_venta.desc()).limit(5).all()
 
     return render_template('admin/dashboard.html',
@@ -119,8 +119,9 @@ def dashboard():
 def index():
     return redirect(url_for('admin.dashboard'))
 
+
 # -----------------------------------------------------------------------------
-# --- NUEVO FLUJO DE GESTIÓN DE PRODUCTOS CON ATRIBUTOS DINÁMICOS ---
+# --- FLUJO DE GESTIÓN DE PRODUCTOS CON ATRIBUTOS DINÁMICOS ---
 # -----------------------------------------------------------------------------
 @bp.route('/productos')
 def listar_productos():
@@ -151,7 +152,7 @@ def seleccionar_tipo_producto():
 def crear_producto_dinamico(tipo_id):
     tipo = TipoProducto.query.get_or_404(tipo_id)
 
-    # --- Construcción dinámica del formulario ---
+    #Construcción dinámica del formulario
     class DynamicProductForm(FlaskForm):
         nombre = StringField('Nombre del Producto', validators=[DataRequired()])
         descripcion = TextAreaField('Descripción')
@@ -203,7 +204,7 @@ def crear_producto_dinamico(tipo_id):
 
     return render_template('admin/crear_editar_producto_dinamico.html', form=form, tipo=tipo, titulo=f'Crear Nuevo {tipo.nombre}')
 
-# NOTA: La ruta 'editar_producto' se deja para una futura implementación
+#La ruta 'editar_producto' se deja para una futura implementación
 @bp.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
 @admin_required
 def editar_producto(id):
@@ -214,13 +215,14 @@ def editar_producto(id):
 @admin_required
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
-    # También eliminamos las asociaciones de ventas para mantener la integridad
+    #También eliminamos las asociaciones de ventas para mantener la integridad
     VentaProducto.query.filter_by(producto_id=id).delete()
     ValorAtributoProducto.query.filter_by(producto_id=id).delete()
     db.session.delete(producto)
     db.session.commit()
     flash('¡Producto eliminado exitosamente!', 'success')
     return redirect(url_for('admin.listar_productos'))
+
 
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA CLIENTES ---
@@ -282,7 +284,7 @@ def buscar_clientes():
     if not search_term:
         return jsonify([])
 
-    # Buscamos por nombre, apellido o identificación
+    #Buscamos por nombre, apellido o identificación
     clientes = Cliente.query.filter(
         or_(
             (Cliente.nombre + ' ' + Cliente.apellido).ilike(f'%{search_term}%'),
@@ -290,11 +292,12 @@ def buscar_clientes():
         )
     ).limit(10).all()
 
-    # Devolvemos los resultados en formato JSON
+    #Devolvemos los resultados en formato JSON
     return jsonify([
         {'id': c.id, 'text': f"{c.nombre} {c.apellido or ''} ({c.identificacion or 'Sin ID'})"}
         for c in clientes
     ])
+
 
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA VENTAS ---
@@ -418,7 +421,7 @@ def agregar_pago(id):
         if monto_pago_actual > saldo_pendiente and not isclose(monto_pago_actual, saldo_pendiente):
             flash('El monto del pago no puede exceder el saldo pendiente.', 'danger')
         else:
-            # Creamos el nuevo pago
+            #Creamos el nuevo pago
             nuevo_pago = Pago(
                 monto_pago=monto_pago_actual,
                 metodo_pago=pago_form.metodo_pago.data,
@@ -452,20 +455,17 @@ def anular_venta(id):
     form = AnularVentaForm()
 
     if form.validate_on_submit():
-        # Devolver el stock de los productos al inventario
+        #Devolver el stock de los productos al inventario
         for item in venta.productos_asociados:
             producto = Producto.query.get(item.producto_id)
             if producto:
                 producto.stock += item.cantidad
 
-        # Marcar la venta como anulada
+        #Marcar la venta como anulada
         venta.estado = 'Anulada'
         venta.motivo_anulacion = form.motivo_anulacion.data
         venta.anulada_por_id = current_user.id
         venta.fecha_anulacion = datetime.utcnow()
-
-        # Opcional: ¿Qué hacer con los pagos? Por ahora, los dejamos para el registro.
-        # En un sistema más complejo, se podría generar una nota de crédito.
 
         db.session.commit()
         flash(f'Venta #{venta.id} ha sido anulada exitosamente.', 'success')
@@ -474,23 +474,29 @@ def anular_venta(id):
 
     return redirect(url_for('admin.listar_ventas'))
 
-# -----------------------------------------------------------------------------
-# --- RUTAS PARA GENERACIÓN DE IMÁGENES ---
-# -----------------------------------------------------------------------------
-def _generar_imagen_playwright(html_string, output_path):
-    with sync_playwright() as p:
-        # Lanza Chromium con un argumento para permitir el acceso a archivos locales.
-        # Esto es crucial para URLs tipo 'file://'
-        browser = p.chromium.launch(args=['--allow-file-access-from-files'])
-        page = browser.new_page()
-        page.set_viewport_size({"width": 800, "height": 1200})
-        page.set_content(html_string, wait_until='networkidle') # Añadido wait_until para mayor robustez
-        # Asegúrate de que el selector es correcto para tu factura/recibo.
-        # En tu invoice_template.html usas '.invoice-container'
-        # Si receipt_template.html usa '.receipt-box', entonces necesitarías una lógica condicional
-        # o renombrar la clase principal en receipt_template.html a .invoice-container también.
-        page.locator('.invoice-container').screenshot(path=output_path)
-        browser.close()
+
+def _generar_imagen_weasyprint(html_string, output_path):
+    try:
+        #La URL base es necesaria para que WeasyPrint pueda encontrar archivos
+        base_url = request.url_root
+        html_doc = HTML(string=html_string, base_url=base_url)
+
+        #CREAR REGLA CSS
+        css_style = CSS(string='@page { size: A4; margin: 0; }')
+
+        #GENERAR PDF EN MEMORIA
+        pdf_in_memory = html_doc.write_pdf(stylesheets=[css_style])
+
+        #CONVERTIR PDF A IMAGEN
+        images = convert_from_bytes(pdf_in_memory)
+
+        #GUARDAR LA IMAGEN
+        if images:
+            images[0].save(output_path, 'PNG')
+
+    except Exception as e:
+        current_app.logger.error(f"Error al generar imagen con WeasyPrint/pdf2image: {e}", exc_info=True)
+        raise
 
 @bp.route('/ventas/<int:id>/generar_recibo')
 @login_required
@@ -500,15 +506,10 @@ def generar_recibo_venta(id):
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
 
-    logo_abs_path = None
+    logo_url = None
     if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-RECIBO: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-RECIBO: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-RECIBO: El archivo del logo EXISTE en: {logo_abs_path}")
+        path_absoluto = os.path.join(current_app.static_folder, config.logo_path)
+        logo_url = f"file://{path_absoluto}"
 
     html_out = render_template(
         'admin/receipts/receipt_template.html',
@@ -516,7 +517,7 @@ def generar_recibo_venta(id):
         total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_path_abs=logo_abs_path
+        logo_url=logo_url
     )
 
     receipts_dir = os.path.join(current_app.static_folder, 'receipts')
@@ -525,18 +526,20 @@ def generar_recibo_venta(id):
     filepath = os.path.join(receipts_dir, filename)
 
     try:
-        # Llamar a la función auxiliar
-        _generar_imagen_playwright(html_out, filepath)
-
+        _generar_imagen_weasyprint(html_out, filepath)
     except Exception as e:
         flash(f'Error al generar la imagen del recibo: {e}', 'danger')
         current_app.logger.error(f"Error en generar_recibo_venta: {e}", exc_info=True)
         return redirect(url_for('admin.ver_venta', id=id))
 
     flash('¡Recibo en imagen generado exitosamente!', 'success')
-    image_url = url_for('static', filename=os.path.join('receipts', filename))
-    return redirect(url_for('admin.ver_venta', id=id, generated_image_url=image_url))
 
+    image_path = url_for('static', filename=os.path.join('receipts', filename))
+    timestamp = datetime.utcnow().timestamp()
+
+    destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
+
+    return redirect(destination_url)
 
 @bp.route('/ventas/<int:id>/generar_factura')
 @login_required
@@ -547,26 +550,21 @@ def generar_factura_venta(id):
         return redirect(url_for('admin.ver_venta', id=id))
 
     pagos = venta.pagos.order_by(Pago.fecha_pago.asc()).all()
-    total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
     config = Configuracion.obtener_config()
+    total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
 
-    logo_abs_path = None
+    logo_url = None
     if config and config.logo_path:
-        logo_abs_path = os.path.join(current_app.static_folder, config.logo_path)
-        current_app.logger.info(f"DEBUG-FACTURA: Ruta Playwright (antes de verificar): {logo_abs_path}")
-        if not os.path.exists(logo_abs_path):
-            current_app.logger.error(f"DEBUG-FACTURA: ¡ERROR! El archivo del logo NO EXISTE en: {logo_abs_path}")
-            logo_abs_path = None
-        else:
-            current_app.logger.info(f"DEBUG-FACTURA: El archivo del logo EXISTE en: {logo_abs_path}")
+        path_absoluto = os.path.join(current_app.static_folder, config.logo_path)
+        logo_url = f"file://{path_absoluto}"
 
     html_out = render_template(
         'admin/receipts/invoice_template.html',
         venta=venta,
-        total_pagado=total_pagado,
         pagos=pagos,
+        total_pagado=total_pagado,
         tienda_config=config,
-        logo_path_abs=logo_abs_path,
+        logo_url=logo_url,
         now=datetime.utcnow()
     )
 
@@ -576,17 +574,21 @@ def generar_factura_venta(id):
     filepath = os.path.join(receipts_dir, filename)
 
     try:
-        # Llamar a la función auxiliar
-        _generar_imagen_playwright(html_out, filepath)
-
+        _generar_imagen_weasyprint(html_out, filepath)
     except Exception as e:
         flash(f'Error al generar la imagen de la factura: {e}', 'danger')
         current_app.logger.error(f"Error en generar_factura_venta: {e}", exc_info=True)
         return redirect(url_for('admin.ver_venta', id=id))
 
     flash('¡Factura final generada exitosamente!', 'success')
-    image_url = url_for('static', filename=os.path.join('receipts', filename))
-    return redirect(url_for('admin.ver_venta', id=id, generated_image_url=image_url))
+
+    image_path = url_for('static', filename=os.path.join('receipts', filename))
+    timestamp = datetime.utcnow().timestamp()
+
+    destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
+
+    return redirect(destination_url)
+
 
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA GESTIÓN DE USUARIOS ---
@@ -647,6 +649,7 @@ def eliminar_usuario(id):
     flash('Usuario eliminado exitosamente.', 'success')
     return redirect(url_for('admin.listar_usuarios'))
 
+
 # -----------------------------------------------------------------------------
 # --- RUTAS PARA TIPOS DE PRODUCTO Y ATRIBUTOS DINÁMICOS ---
 # -----------------------------------------------------------------------------
@@ -654,7 +657,6 @@ def eliminar_usuario(id):
 @admin_required
 def listar_tipos_producto():
     tipos = TipoProducto.query.order_by(TipoProducto.nombre).all()
-    # Pasamos un formulario vacío para el token CSRF en el botón de eliminar
     form = TipoProductoForm()
     return render_template('admin/tipos_producto.html', tipos=tipos, form=form)
 
