@@ -14,8 +14,9 @@
                 </ol>
             </nav>
         </div>
-        <span class="badge fs-6 {% if venta.estado == 'Pagada' %}bg-success{% elif venta.estado == 'Pendiente'%}bg-warning text-dark{% elif venta.estado == 'Anulada' %}bg-danger{% else %}bg-secondary{% endif %}">
-            <i class="fas fa-{% if venta.estado == 'Pagada' %}check-circle{% elif venta.estado == 'Pendiente'%}clock{% elif venta.estado == 'Anulada' %}times-circle{% else %}question-circle{% endif %} me-1"></i>
+        {# === SECCIÓN DE ESTADO ACTUALIZADA PARA INCLUIR 'CREDITO' === #}
+        <span class="badge fs-6 {% if venta.estado == 'Pagada' %}bg-success{% elif venta.estado == 'Pendiente'%}bg-warning text-dark{% elif venta.estado == 'Anulada' %}bg-danger{% elif venta.estado == 'Credito' %}bg-primary{% else %}bg-secondary{% endif %}">
+            <i class="fas fa-{% if venta.estado == 'Pagada' %}check-circle{% elif venta.estado == 'Pendiente'%}clock{% elif venta.estado == 'Anulada' %}times-circle{% elif venta.estado == 'Credito' %}calendar-alt{% else %}question-circle{% endif %} me-1"></i>
             {{ venta.estado }}
         </span>
     </div>
@@ -51,7 +52,7 @@
     </div>
 
     <div class="row g-4">
-        <!-- Columna Izquierda: Resumen Financiero y Productos -->
+        <!-- Columna Izquierda: Resumen Financiero, Productos y Plan de Pagos -->
         <div class="col-lg-7">
             <!-- Resumen Financiero -->
             <div class="card border-0 shadow-sm mb-4">
@@ -133,6 +134,49 @@
                 </div>
             </div>
 
+            {# === NUEVA SECCIÓN: PLAN DE PAGOS (SI LA VENTA ES A CRÉDITO) === #}
+            {% if venta.tipo_pago == 'Credito' %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2 text-primary"></i> Plan de Pagos</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th class="text-center"># Cuota</th>
+                                <th>Fecha de Vencimiento</th>
+                                <th class="text-end">Capital</th>
+                                <th class="text-end">Interés</th>
+                                <th class="text-end">Total Cuota</th>
+                                <th class="text-center">Estado</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for cuota in venta.plan_pagos %}
+                            <tr>
+                                <td class="text-center fw-bold">{{ cuota.numero_cuota }}</td>
+                                <td>{{ cuota.fecha_vencimiento.strftime('%Y-%m-%d') }}</td>
+                                <td class="text-end">${{ "%.2f"|format(cuota.monto_capital) }}</td>
+                                <td class="text-end">${{ "%.2f"|format(cuota.monto_interes) }}</td>
+                                <td class="text-end fw-bold">${{ "%.2f"|format(cuota.monto_total_cuota) }}</td>
+                                <td class="text-center">
+                                    <span class="badge {% if cuota.estado == 'Pagada' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ cuota.estado }}</span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted p-4">No se generó un plan de pagos para esta venta.</td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if venta.notas %}
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 border-0">
@@ -149,7 +193,8 @@
 
         <!-- Columna Derecha: Pagos -->
         <div class="col-lg-5">
-            {% if venta.estado != 'Pagada' and venta.estado != 'Anulada' %}
+            {# Ocultar el formulario de pago si la venta es a crédito, ya que los pagos se gestionarán por cuota #}
+            {% if venta.estado != 'Pagada' and venta.estado != 'Anulada' and venta.tipo_pago != 'Credito' %}
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-primary text-white py-3">
                     <h5 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i> Registrar Pago</h5>
@@ -187,7 +232,7 @@
                     <h5 class="mb-0"><i class="fas fa-history me-2 text-primary"></i> Historial de Pagos</h5>
                 </div>
                 <div class="card-body p-0">
-                    {% if venta.pagos %}
+                    {% if venta.pagos.count() > 0 %}
                     <div class="list-group list-group-flush">
                         {% for pago in venta.pagos %}
                         <div class="list-group-item">
@@ -243,9 +288,7 @@
             <h5 class="mb-0"><i class="fas fa-receipt me-2 text-primary"></i> Vista Previa del Recibo</h5>
         </div>
         <div class="card-body text-center">
-            {# Creamos la URL completa uniendo los dos parámetros #}
             {% set full_image_url = request.args.get('generated_image_url') + '?v=' + request.args.get('v') %}
-
             <a href="{{ full_image_url }}" target="_blank">
                 <img src="{{ full_image_url }}" class="img-fluid rounded border shadow-sm" alt="Vista previa del recibo" style="max-height: 400px;">
             </a>
@@ -279,7 +322,6 @@
         }
 
         const shareButton = document.getElementById('share-button');
-        // Reconstruimos la URL completa en JavaScript a partir de los parámetros
         const imageUrlBase = "{{ request.args.get('generated_image_url') or '' }}";
         const imageTimestamp = "{{ request.args.get('v') or '' }}";
         const fullImageUrl = imageUrlBase && imageTimestamp ? `${imageUrlBase}?v=${imageTimestamp}` : '';
