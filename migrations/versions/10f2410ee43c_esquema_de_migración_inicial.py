@@ -1,8 +1,8 @@
-"""Migración inicial
+"""Esquema de migración inicial
 
-Revision ID: e550d12176af
+Revision ID: 10f2410ee43c
 Revises: 
-Create Date: 2025-08-26 18:02:50.091855
+Create Date: 2025-08-30 16:59:00.013692
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e550d12176af'
+revision = '10f2410ee43c'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,12 +26,24 @@ def upgrade():
     sa.Column('email', sa.String(length=120), nullable=True),
     sa.Column('direccion', sa.String(length=255), nullable=True),
     sa.Column('ciudad', sa.String(length=64), nullable=True),
+    sa.Column('identificacion', sa.String(length=20), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('cliente', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_cliente_email'), ['email'], unique=False)
+        batch_op.create_index(batch_op.f('ix_cliente_identificacion'), ['identificacion'], unique=True)
         batch_op.create_index(batch_op.f('ix_cliente_telefono'), ['telefono'], unique=False)
 
+    op.create_table('configuracion',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('nombre_tienda', sa.String(length=100), nullable=True),
+    sa.Column('logo_path', sa.String(length=255), nullable=True),
+    sa.Column('ruc', sa.String(length=13), nullable=True),
+    sa.Column('telefono', sa.String(length=20), nullable=True),
+    sa.Column('direccion', sa.String(length=255), nullable=True),
+    sa.Column('email', sa.String(length=120), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('tipo_producto',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=100), nullable=False),
@@ -44,6 +56,8 @@ def upgrade():
     sa.Column('email', sa.String(length=120), nullable=False),
     sa.Column('password_hash', sa.String(length=256), nullable=True),
     sa.Column('rol', sa.String(length=20), nullable=False),
+    sa.Column('failed_login_attempts', sa.Integer(), nullable=True),
+    sa.Column('lockout_until', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('usuario', schema=None) as batch_op:
@@ -75,6 +89,10 @@ def upgrade():
     sa.Column('estado', sa.String(length=20), nullable=False),
     sa.Column('cliente_id', sa.Integer(), nullable=True),
     sa.Column('notas', sa.Text(), nullable=True),
+    sa.Column('anulada_por_id', sa.Integer(), nullable=True),
+    sa.Column('motivo_anulacion', sa.Text(), nullable=True),
+    sa.Column('fecha_anulacion', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['anulada_por_id'], ['usuario.id'], ),
     sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -94,6 +112,7 @@ def upgrade():
     sa.Column('fecha_pago', sa.DateTime(), nullable=True),
     sa.Column('metodo_pago', sa.String(length=50), nullable=True),
     sa.Column('venta_id', sa.Integer(), nullable=True),
+    sa.Column('comprobante_path', sa.String(length=255), nullable=True),
     sa.ForeignKeyConstraint(['venta_id'], ['venta.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -136,8 +155,10 @@ def downgrade():
 
     op.drop_table('usuario')
     op.drop_table('tipo_producto')
+    op.drop_table('configuracion')
     with op.batch_alter_table('cliente', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_cliente_telefono'))
+        batch_op.drop_index(batch_op.f('ix_cliente_identificacion'))
         batch_op.drop_index(batch_op.f('ix_cliente_email'))
 
     op.drop_table('cliente')

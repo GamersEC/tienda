@@ -2,105 +2,167 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %} - {{ tienda_config.nombre_tienda or 'Admin' }}</title>
-    <!-- Usamos Bootstrap 5 para un diseño limpio y responsivo -->
+    <!-- Dependencias de CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         body {
-            padding-top: 5rem;
-            background-color: #f8f9fa; /* Un fondo ligeramente gris */
+            font-size: .875rem;
+            background-color: #f8f9fa;
         }
-        .flash-messages {
-            list-style: none;
-            padding: 0;
-            margin-bottom: 1rem;
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+        }
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: calc(100vh - 48px);
+            padding-top: .5rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        .nav-link {
+            font-weight: 500;
+            color: #333;
+        }
+        .nav-link .fas {
+            width: 24px;
+            text-align: center;
+        }
+        .nav-link.active {
+            color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        main {
+            padding-top: 48px; /* Altura de la navbar superior */
         }
         .navbar-brand img {
-            max-height: 30px; /* Ajustar el tamaño del logo en la navbar */
+            max-height: 30px;
             margin-right: 10px;
         }
     </style>
 </head>
 <body>
-<!-- Barra de Navegación Fija -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
-    <div class="container-fluid">
-        <!-- === SECCIÓN DE BRANDING MEJORADA === -->
-        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('admin.dashboard') }}">
-            {% if tienda_config and tienda_config.logo_path %}
-            <img src="{{ url_for('static', filename=tienda_config.logo_path) }}" alt="Logo">
-            {% endif %}
-            <span>{{ tienda_config.nombre_tienda or 'Mi Tienda' }} Admin</span>
-        </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <!-- === NUEVO ENLACE AL DASHBOARD === -->
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('admin.listar_productos') }}">Productos</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('admin.listar_clientes') }}">Clientes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('admin.listar_ventas') }}">Ventas</a>
-                </li>
-            </ul>
+<!-- =================================================================
+     BARRA DE NAVEGACIÓN SUPERIOR (FIJA)
+================================================================== -->
+<header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 d-flex align-items-center" href="{{ url_for('admin.dashboard') }}">
+        {% if tienda_config and tienda_config.logo_path %}
+        <img src="{{ url_for('static', filename=tienda_config.logo_path) }}" alt="Logo">
+        {% endif %}
+        <span>{{ tienda_config.nombre_tienda or 'Mi Tienda' }}</span>
+    </a>
+    <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
 
-            <!-- === SECCIÓN DE USUARIO CORREGIDA Y REORGANIZADA === -->
-            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                {% if current_user.is_authenticated %}
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ current_user.nombre }} ({{ current_user.rol }})
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                        {% if current_user.is_admin %}
-                        <li><h6 class="dropdown-header">Administración</h6></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.listar_usuarios') }}">Gestionar Usuarios</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.listar_tipos_producto') }}">Tipos de Producto</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.configuracion_tienda') }}">Configuración Tienda</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        {% endif %}
-                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión</a></li>
-                    </ul>
-                </li>
-                {% else %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('auth.login') }}">Iniciar Sesión</a>
-                </li>
+    <!-- === SECCIÓN DE USUARIO === -->
+    <div class="navbar-nav ms-auto">
+        <div class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle px-3" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-user-circle"></i> {{ current_user.nombre }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="navbarDropdown">
+                {% if current_user.is_admin %}
+                <li><h6 class="dropdown-header">Administración</h6></li>
+                <li><a class="dropdown-item {% if request.endpoint == 'admin.listar_usuarios' %}active{% endif %}" href="{{ url_for('admin.listar_usuarios') }}">Gestionar Usuarios</a></li>
+                <li><a class="dropdown-item {% if request.endpoint == 'admin.listar_tipos_producto' %}active{% endif %}" href="{{ url_for('admin.listar_tipos_producto') }}">Tipos de Producto</a></li>
+                <li><a class="dropdown-item {% if 'categoria_gasto' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.listar_categorias_gasto') }}">Categorías de Gasto</a></li>
+                <li><a class="dropdown-item {% if request.endpoint == 'admin.configuracion_tienda' %}active{% endif %}" href="{{ url_for('admin.configuracion_tienda') }}">Configuración Tienda</a></li>
+                <li><hr class="dropdown-divider"></li>
                 {% endif %}
+                <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
             </ul>
         </div>
     </div>
-</nav>
+</header>
 
-<!-- Contenido Principal -->
-<main class="container my-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="flash-messages">
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        {% endfor %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- =================================================================
+             BARRA LATERAL DE NAVEGACIÓN
+        ================================================================== -->
+        <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.listar_ventas' %}active{% endif %}" href="{{ url_for('admin.listar_ventas') }}">
+                            <i class="fas fa-shopping-cart"></i> Ventas
+                        </a>
+                    </li>
+                    <!-- === NUEVO ENLACE A GASTOS === -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.listar_gastos' %}active{% endif %}" href="{{ url_for('admin.listar_gastos') }}">
+                            <i class="fas fa-receipt"></i> Gastos
+                        </a>
+                    </li>
+                </ul>
+
+                <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                    <span>Gestión</span>
+                </h6>
+                <ul class="nav flex-column mb-2">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'producto' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.listar_productos') }}">
+                            <i class="fas fa-box-open"></i> Productos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'cliente' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.listar_clientes') }}">
+                            <i class="fas fa-users"></i> Clientes
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- =================================================================
+             CONTENIDO PRINCIPAL DE LA PÁGINA
+        ================================================================== -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+
+            <footer class="pt-4 my-md-5 pt-md-5 border-top text-center text-muted">
+                <small>&copy; 2025 {{ tienda_config.nombre_tienda or 'Mi Tienda' }} - Sistema de Gestión</small>
+            </footer>
+        </main>
     </div>
-    {% endif %}
-    {% endwith %}
+</div>
 
-    {% block content %}{% endblock %}
-</main>
-
-<!-- Scripts de Bootstrap -->
+<!-- =================================================================
+     BLOQUE DE SCRIPTS
+================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Bloque para scripts específicos de cada página (como la inicialización del gráfico) -->
+{% block scripts %}{% endblock %}
+
 </body>
 </html>

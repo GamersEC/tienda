@@ -4,6 +4,7 @@ from wtforms import StringField, TextAreaField, DecimalField, IntegerField, Subm
 from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional
 from wtforms_sqlalchemy.fields import QuerySelectField
 from app.models.cliente import Cliente
+from app.models.categoria_gasto import CategoriaGasto
 
 
 class ClienteForm(FlaskForm):
@@ -101,3 +102,22 @@ class ConfiguracionForm(FlaskForm):
     email = StringField('Email de Contacto')
 
     submit = SubmitField('Guardar Configuración')
+
+
+class CategoriaGastoForm(FlaskForm):
+    nombre = StringField('Nombre de la Categoría', validators=[DataRequired()])
+    submit = SubmitField('Guardar')
+
+def categorias_query():
+    return CategoriaGasto.query.order_by(CategoriaGasto.nombre)
+
+
+class GastoForm(FlaskForm):
+    descripcion = StringField('Descripción del Gasto', validators=[DataRequired()])
+    monto = DecimalField('Monto', validators=[DataRequired(), NumberRange(min=0.01)])
+    categoria = QuerySelectField('Categoría',
+                                 query_factory=categorias_query,
+                                 get_label='nombre',
+                                 allow_blank=False,
+                                 validators=[DataRequired()])
+    submit = SubmitField('Guardar Gasto')

@@ -1,7 +1,7 @@
 import os
 from flask import render_template, redirect, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, cast, Date
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import uuid
@@ -31,12 +31,14 @@ from app.models.tipo_producto import TipoProducto
 from app.models.atributo import Atributo, OpcionAtributo
 from app.models.valor_atributo_producto import ValorAtributoProducto
 from app.models.configuracion import Configuracion
+from app.models.gasto import Gasto
+from app.models.categoria_gasto import CategoriaGasto
 
 #Importación de todos los Formularios
 from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
-    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm
+    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm, GastoForm, CategoriaGastoForm
 )
 
 
@@ -89,30 +91,89 @@ def before_request():
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    #Consultas para las estadísticas
-    #Ventas de Hoy
+    #Fechas de referencia
     hoy_inicio = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    ventas_hoy = Venta.query.filter(Venta.fecha_venta >= hoy_inicio).count()
-    ingresos_hoy = db.session.query(func.sum(Venta.monto_total)).filter(Venta.fecha_venta >= hoy_inicio).scalar() or 0
+    hace_30_dias = datetime.utcnow() - timedelta(days=30)
 
-    #Total de Clientes y Productos
-    total_clientes = Cliente.query.count()
-    total_productos = Producto.query.count()
+    #Ingresos
+    ingresos_hoy = db.session.query(func.sum(Venta.monto_total)).filter(
+        Venta.fecha_venta >= hoy_inicio, Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).scalar() or 0
+    ingresos_mes = db.session.query(func.sum(Venta.monto_total)).filter(
+        Venta.fecha_venta >= hace_30_dias, Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).scalar() or 0
+    ventas_hoy = Venta.query.filter(
+        Venta.fecha_venta >= hoy_inicio, Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).count()
+
+    #Gastos
+    gastos_hoy = db.session.query(func.sum(Gasto.monto)).filter(Gasto.fecha >= hoy_inicio).scalar() or 0
+    gastos_mes = db.session.query(func.sum(Gasto.monto)).filter(Gasto.fecha >= hace_30_dias).scalar() or 0
+
+    #Beneficio Neto
+    beneficio_neto_mes = ingresos_mes - gastos_mes
+
+    #Grafico de ventas diarias (ultimos 30 días)
+    ventas_por_dia = db.session.query(
+        cast(Venta.fecha_venta, Date).label('dia'),
+        func.sum(Venta.monto_total).label('total_vendido')
+    ).filter(
+        Venta.fecha_venta >= hace_30_dias,
+        Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).group_by('dia').order_by('dia').all()
+    chart_labels = [venta.dia.strftime('%d %b') for venta in ventas_por_dia]
+    chart_data = [float(venta.total_vendido) for venta in ventas_por_dia]
+
+    #Top 5 Productos más Vendidos (por cantidad)
+    top_productos = db.session.query(
+        Producto,
+        func.sum(VentaProducto.cantidad).label('total_cantidad')
+    ).join(VentaProducto, Producto.id == VentaProducto.producto_id) \
+        .join(Venta, Venta.id == VentaProducto.venta_id) \
+        .filter(
+        Venta.fecha_venta >= hace_30_dias,
+        Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).group_by(Producto.id).order_by(func.sum(VentaProducto.cantidad).desc()).limit(5).all()
+
+    #Top 5 Clientes (por total gastado)
+    top_clientes = db.session.query(
+        Cliente,
+        func.sum(Venta.monto_total).label('total_gastado')
+    ).join(Cliente, Venta.cliente_id == Cliente.id) \
+        .filter(
+        Venta.fecha_venta >= hace_30_dias,
+        Venta.estado.in_(['Pagada', 'Pendiente'])
+    ).group_by(Cliente.id).order_by(func.sum(Venta.monto_total).desc()).limit(5).all()
+
+    #Top 5 Categorías de Gastos
+    top_categorias_gasto = db.session.query(
+        CategoriaGasto.nombre,
+        func.sum(Gasto.monto).label('total_gastado')
+    ).join(CategoriaGasto, Gasto.categoria_id == CategoriaGasto.id) \
+        .filter(Gasto.fecha >= hace_30_dias) \
+        .group_by(CategoriaGasto.nombre) \
+        .order_by(func.sum(Gasto.monto).desc()) \
+        .limit(5).all()
 
     #Productos con bajo stock
     productos_bajo_stock = Producto.query.filter(Producto.stock <= 5).order_by(Producto.stock.asc()).limit(5).all()
 
-    #Últimas 5 ventas registradas
-    ultimas_ventas = Venta.query.order_by(Venta.fecha_venta.desc()).limit(5).all()
-
     return render_template('admin/dashboard.html',
-                           ventas_hoy=ventas_hoy,
+                           titulo='Dashboard Analítico',
+                           # Métricas clave
                            ingresos_hoy=ingresos_hoy,
-                           total_clientes=total_clientes,
-                           total_productos=total_productos,
-                           productos_bajo_stock=productos_bajo_stock,
-                           ultimas_ventas=ultimas_ventas,
-                           titulo='Dashboard')
+                           ventas_hoy=ventas_hoy,
+                           gastos_hoy=gastos_hoy,
+                           beneficio_neto_mes=beneficio_neto_mes,
+                           # Datos para el gráfico
+                           chart_labels=chart_labels,
+                           chart_data=chart_data,
+                           # Listas "Top 5"
+                           top_productos=top_productos,
+                           top_clientes=top_clientes,
+                           top_categorias_gasto=top_categorias_gasto,
+                           productos_bajo_stock=productos_bajo_stock
+                           )
 
 @bp.route('/')
 @login_required
@@ -204,12 +265,85 @@ def crear_producto_dinamico(tipo_id):
 
     return render_template('admin/crear_editar_producto_dinamico.html', form=form, tipo=tipo, titulo=f'Crear Nuevo {tipo.nombre}')
 
-#La ruta 'editar_producto' se deja para una futura implementación
 @bp.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
 @admin_required
 def editar_producto(id):
-    flash('La edición de productos con atributos dinámicos es una funcionalidad avanzada pendiente de implementación.', 'info')
-    return redirect(url_for('admin.listar_productos'))
+    producto = Producto.query.get_or_404(id)
+    tipo = producto.tipo_producto
+
+    class DynamicProductForm(FlaskForm):
+        nombre = StringField('Nombre del Producto', validators=[DataRequired()])
+        descripcion = TextAreaField('Descripción')
+        precio = DecimalField('Precio', validators=[DataRequired(), NumberRange(min=0)])
+        stock = IntegerField('Stock Disponible', validators=[DataRequired(), NumberRange(min=0)])
+
+    for atributo in tipo.atributos:
+        field_name = f'attr_{atributo.id}'
+        validators = [DataRequired()]
+        field = None
+
+        if atributo.tipo_campo == 'Texto':
+            field = StringField(atributo.nombre_atributo, validators=validators)
+        elif atributo.tipo_campo == 'Numero':
+            field = IntegerField(atributo.nombre_atributo, validators=validators)
+        elif atributo.tipo_campo == 'Seleccion':
+            choices = [(op.valor_opcion, op.valor_opcion) for op in atributo.opciones]
+            field = SelectField(atributo.nombre_atributo, choices=choices, validators=validators)
+
+        if field:
+            setattr(DynamicProductForm, field_name, field)
+
+    form = DynamicProductForm(obj=producto)
+
+    if form.validate_on_submit():
+        #Actualizar los datos principales del producto
+        producto.nombre = form.nombre.data
+        producto.descripcion = form.descripcion.data
+        producto.precio = form.precio.data
+        producto.stock = form.stock.data
+
+        #Actualizar los valores de los atributos dinámicos
+        for atributo in tipo.atributos:
+            field_name = f'attr_{atributo.id}'
+            valor_data = form[field_name].data
+
+            #Busca el valor existente para este atributo y producto
+            valor_atributo_existente = ValorAtributoProducto.query.filter_by(
+                producto_id=producto.id,
+                atributo_id=atributo.id
+            ).first()
+
+            if valor_atributo_existente:
+                valor_atributo_existente.valor = str(valor_data)
+            else:
+                #En el caso improbable de que no exista, lo creamos
+                nuevo_valor = ValorAtributoProducto(
+                    valor=str(valor_data),
+                    producto_id=producto.id,
+                    atributo_id=atributo.id
+                )
+                db.session.add(nuevo_valor)
+
+        db.session.commit()
+        flash('Producto actualizado exitosamente.', 'success')
+        return redirect(url_for('admin.listar_productos'))
+
+    #Logica para precargar el formulario con los datos existentes
+    for atributo in tipo.atributos:
+        field_name = f'attr_{atributo.id}'
+        valor_existente = ValorAtributoProducto.query.filter_by(
+            producto_id=producto.id,
+            atributo_id=atributo.id
+        ).first()
+        if valor_existente:
+            #Obtiene el campo del formulario y asigna su valor
+            form_field = getattr(form, field_name)
+            form_field.data = valor_existente.valor
+
+    return render_template('admin/crear_editar_producto_dinamico.html',
+                           form=form,
+                           tipo=tipo,
+                           titulo=f'Editar Producto: {producto.nombre}')
 
 @bp.route('/productos/eliminar/<int:id>', methods=['POST'])
 @admin_required
@@ -297,6 +431,105 @@ def buscar_clientes():
         {'id': c.id, 'text': f"{c.nombre} {c.apellido or ''} ({c.identificacion or 'Sin ID'})"}
         for c in clientes
     ])
+
+
+# -----------------------------------------------------------------------------
+# --- RUTAS PARA GESTIÓN DE GASTOS ---
+# -----------------------------------------------------------------------------
+@bp.route('/gastos')
+@login_required
+def listar_gastos():
+    gastos = Gasto.query.order_by(Gasto.fecha.desc()).all()
+    return render_template('admin/gastos.html', gastos=gastos, titulo='Registro de Gastos')
+
+@bp.route('/gastos/crear', methods=['GET', 'POST'])
+@admin_required
+def crear_gasto():
+    form = GastoForm()
+    if not CategoriaGasto.query.first():
+        flash('Primero debes crear al menos una categoría de gasto.', 'warning')
+        return redirect(url_for('admin.listar_categorias_gasto'))
+    if form.validate_on_submit():
+        nuevo_gasto = Gasto(
+            descripcion=form.descripcion.data,
+            monto=form.monto.data,
+            categoria=form.categoria.data, # form.categoria.data ahora es un objeto CategoriaGasto
+            usuario_id=current_user.id
+        )
+        db.session.add(nuevo_gasto)
+        db.session.commit()
+        flash('Gasto registrado exitosamente.', 'success')
+        return redirect(url_for('admin.listar_gastos'))
+    return render_template('admin/crear_editar_gasto.html', form=form, titulo='Registrar Nuevo Gasto')
+
+@bp.route('/gastos/editar/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def editar_gasto(id):
+    gasto = Gasto.query.get_or_404(id)
+    form = GastoForm(obj=gasto)
+    if form.validate_on_submit():
+        gasto.descripcion = form.descripcion.data
+        gasto.monto = form.monto.data
+        gasto.categoria = form.categoria.data
+        db.session.commit()
+        flash('Gasto actualizado exitosamente.', 'success')
+        return redirect(url_for('admin.listar_gastos'))
+    return render_template('admin/crear_editar_gasto.html', form=form, titulo='Editar Gasto')
+
+@bp.route('/gastos/eliminar/<int:id>', methods=['POST'])
+@admin_required
+def eliminar_gasto(id):
+    gasto = Gasto.query.get_or_404(id)
+    db.session.delete(gasto)
+    db.session.commit()
+    flash('Gasto eliminado exitosamente.', 'success')
+    return redirect(url_for('admin.listar_gastos'))
+
+
+# -----------------------------------------------------------------------------
+# --- RUTAS PARA CATEGORÍAS DE GASTO ---
+# -----------------------------------------------------------------------------
+@bp.route('/gastos/categorias')
+@admin_required
+def listar_categorias_gasto():
+    categorias = CategoriaGasto.query.order_by(CategoriaGasto.nombre).all()
+    return render_template('admin/categorias_gasto.html', categorias=categorias, titulo='Categorías de Gasto')
+
+@bp.route('/gastos/categorias/crear', methods=['GET', 'POST'])
+@admin_required
+def crear_categoria_gasto():
+    form = CategoriaGastoForm()
+    if form.validate_on_submit():
+        nueva_categoria = CategoriaGasto(nombre=form.nombre.data)
+        db.session.add(nueva_categoria)
+        db.session.commit()
+        flash('Categoría creada exitosamente.', 'success')
+        return redirect(url_for('admin.listar_categorias_gasto'))
+    return render_template('admin/crear_editar_categoria.html', form=form, titulo='Crear Categoría de Gasto')
+
+@bp.route('/gastos/categorias/editar/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def editar_categoria_gasto(id):
+    categoria = CategoriaGasto.query.get_or_404(id)
+    form = CategoriaGastoForm(obj=categoria)
+    if form.validate_on_submit():
+        categoria.nombre = form.nombre.data
+        db.session.commit()
+        flash('Categoría actualizada exitosamente.', 'success')
+        return redirect(url_for('admin.listar_categorias_gasto'))
+    return render_template('admin/crear_editar_categoria.html', form=form, titulo='Editar Categoría de Gasto')
+
+@bp.route('/gastos/categorias/eliminar/<int:id>', methods=['POST'])
+@admin_required
+def eliminar_categoria_gasto(id):
+    categoria = CategoriaGasto.query.get_or_404(id)
+    if categoria.gastos.first():
+        flash('No se puede eliminar la categoría porque tiene gastos asociados.', 'danger')
+    else:
+        db.session.delete(categoria)
+        db.session.commit()
+        flash('Categoría eliminada exitosamente.', 'success')
+    return redirect(url_for('admin.listar_categorias_gasto'))
 
 
 # -----------------------------------------------------------------------------

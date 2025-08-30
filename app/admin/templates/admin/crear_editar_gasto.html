@@ -1,0 +1,52 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo }}</h1>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="POST" novalidate>
+            {{ form.hidden_tag() }} {# Importante para la protección CSRF #}
+
+            <div class="mb-3">
+                {{ form.descripcion.label(class="form-label") }}
+                {{ form.descripcion(class="form-control", rows="3") }}
+                {% for error in form.descripcion.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.monto.label(class="form-label") }}
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        {{ form.monto(class="form-control") }}
+                    </div>
+                    {% for error in form.monto.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.categoria.label(class="form-label") }}
+                    {{ form.categoria(class="form-select") }}
+                    {% for error in form.categoria.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-end">
+                <a href="{{ url_for('admin.listar_gastos') }}" class="btn btn-secondary me-2">Cancelar</a>
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
