@@ -92,12 +92,13 @@ class AnularVentaForm(FlaskForm):
 class ConfiguracionForm(FlaskForm):
     nombre_tienda = StringField('Nombre de la Tienda', validators=[DataRequired()])
     logo = FileField('Logo de la Tienda (Opcional)', validators=[
+        Optional(), #Hacemos el logo opcional
         FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
     ])
     ruc = StringField('RUC')
     telefono = StringField('Teléfono de Contacto')
     direccion = StringField('Dirección de la Tienda')
-    email = StringField('Email de Contacto')
+    email = StringField('Email de Contacto', validators=[Optional(), Email()])
 
     submit = SubmitField('Guardar Configuración')
 
