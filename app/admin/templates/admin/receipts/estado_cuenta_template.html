@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Estado de Cuenta Venta #{{ venta.id }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; font-size: 14px; color: #333; background-color: #f4f4f4; }
+        .container { width: 750px; padding: 35px; margin: 20px; background: #fff; border: 1px solid #ddd; }
+        .header { width: 100%; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 30px; }
+        .header td { vertical-align: top; }
+        .header .store-details { text-align: left; }
+        .header .receipt-title { text-align: right; font-size: 28px; font-weight: bold; }
+        .header .receipt-meta { text-align: right; font-size: 14px; color: #555; }
+        .customer-info { margin-bottom: 30px; }
+        .section-title { font-size: 16px; font-weight: bold; background-color: #eee; padding: 10px; margin-top: 20px; margin-bottom: 0; border: 1px solid #ddd; border-bottom: none; }
+        .items-table { width: 100%; border-collapse: collapse; border: 1px solid #ddd; }
+        .items-table th, .items-table td { border-bottom: 1px solid #ddd; padding: 10px; text-align: left; }
+        .items-table th { font-weight: bold; }
+        .items-table .text-right { text-align: right; }
+        .items-table tr:last-child td { border-bottom: none; }
+        .totals-section { margin-top: 30px; text-align: right; }
+        .totals-box { display: inline-block; width: 45%; background: #f9f9f9; padding: 15px; border: 1px solid #ddd; }
+        .totals-box table { width: 100%; }
+        .totals-box td { padding: 5px 0; }
+        .totals-box .total-label { text-align: left; }
+        .totals-box .total-value { text-align: right; font-weight: bold; }
+        .totals-box .balance-due { font-size: 1.2em; color: #c00; }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; color: #777; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <table class="header">
+        <tr>
+            <td class="store-details">
+                {% if logo_url %}<img src="{{ logo_url }}" alt="Logo" style="max-width: 150px; margin-bottom: 10px;"><br>{% endif %}
+                <strong>{{ tienda_config.nombre_tienda or 'Mi Tienda' }}</strong><br>
+                {% if tienda_config.direccion %}{{ tienda_config.direccion }}<br>{% endif %}
+                {% if tienda_config.telefono %}{{ tienda_config.telefono }}{% endif %}
+            </td>
+            <td>
+                <div class="receipt-title">ESTADO DE CUENTA</div>
+                <div class="receipt-meta">
+                    <strong>Venta #:</strong> {{ venta.id }}<br>
+                    <strong>Fecha de Emisión:</strong> {{ now.strftime('%Y-%m-%d') }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="customer-info">
+        <strong>Cliente:</strong><br>
+        {{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}<br>
+        {% if venta.cliente.identificacion %}ID: {{ venta.cliente.identificacion }}<br>{% endif %}
+    </div>
+
+    <div class="section-title">PLAN DE PAGOS</div>
+    <table class="items-table">
+        <thead>
+        <tr>
+            <th class="text-center"># Cuota</th>
+            <th>Vencimiento</th>
+            <th class="text-right">Monto Cuota</th>
+            <th class="text-right">Estado</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for cuota in venta.plan_pagos %}
+        <tr>
+            <td class="text-center">{{ cuota.numero_cuota }}</td>
+            <td>{{ cuota.fecha_vencimiento.strftime('%Y-%m-%d') }}</td>
+            <td class="text-right">${{ "%.2f"|format(cuota.monto_total_cuota) }}</td>
+            <td class="text-right"><strong>{{ cuota.estado }}</strong></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-section">
+        <div class="totals-box">
+            <table>
+                <tr><td class="total-label">Total Venta:</td><td class="total-value">${{ "%.2f"|format(venta.monto_total) }}</td></tr>
+                <tr><td class="total-label">Total Pagado:</td><td class="total-value">${{ "%.2f"|format(total_pagado) }}</td></tr>
+                <tr style="height: 10px;"></tr>
+                <tr style="border-top: 1px solid #ccc; padding-top: 5px;"><td class="total-label balance-due">Saldo Pendiente Total:</td><td class="total-value balance-due">${{ "%.2f"|format(venta.monto_total - total_pagado) }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        Este es un estado de cuenta informativo.
+    </div>
+</div>
+</body>
+</html>
