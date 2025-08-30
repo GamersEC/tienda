@@ -38,7 +38,7 @@ from app.models.categoria_gasto import CategoriaGasto
 from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
-    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm, GastoForm, CategoriaGastoForm
+    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm, GastoForm, CategoriaGastoForm, InteresForm
 )
 
 
@@ -74,6 +74,27 @@ def configuracion_tienda():
         return redirect(url_for('admin.configuracion_tienda'))
 
     return render_template('admin/configuracion.html', form=form, config=config, titulo='Configuración de la Tienda')
+
+@bp.route('/configuracion/intereses', methods=['GET', 'POST'])
+@admin_required
+def configuracion_intereses():
+    config = Configuracion.obtener_config()
+    if not config:
+        # En el caso improbable de que no exista, la creamos
+        config = Configuracion()
+        db.session.add(config)
+        db.session.commit()
+
+    form = InteresForm(obj=config)
+    if form.validate_on_submit():
+        config.interes_diario = form.interes_diario.data
+        config.interes_semanal = form.interes_semanal.data
+        config.interes_mensual = form.interes_mensual.data
+        db.session.commit()
+        flash('Las tasas de interés han sido actualizadas exitosamente.', 'success')
+        return redirect(url_for('admin.configuracion_intereses'))
+
+    return render_template('admin/configuracion_intereses.html', form=form, titulo='Tasas de Interés para Créditos')
 
 
 # -----------------------------------------------------------------------------
