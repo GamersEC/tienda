@@ -10,6 +10,7 @@ class Cliente(db.Model):
     ciudad = db.Column(db.String(64), nullable=True)
     identificacion = db.Column(db.String(20), nullable=True, unique=True, index=True)
     ventas = db.relationship('Venta', backref='cliente', lazy='dynamic')
+    notas_credito = db.relationship('NotaCredito', back_populates='cliente', lazy='dynamic', cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Cliente {self.nombre} {self.apellido}>'

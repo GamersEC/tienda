@@ -12,6 +12,7 @@ class Producto(db.Model):
 
     valores_atributos = db.relationship('ValorAtributoProducto', backref='producto', lazy='dynamic', cascade="all, delete-orphan")
     ventas_asociadas = db.relationship('VentaProducto', back_populates='producto')
+    devoluciones_asociadas = db.relationship('DevolucionProducto', back_populates='producto', lazy='dynamic')
 
     def __repr__(self):
         return f'<Producto {self.nombre}>'
