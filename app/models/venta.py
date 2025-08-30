@@ -5,7 +5,7 @@ class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     fecha_venta = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     monto_total = db.Column(db.Numeric(10, 2), nullable=False)
-    estado = db.Column(db.String(20), nullable=False, default='En Proceso') #En Proceso, Pendiente, Pagada, Anulada, Credito
+    estado = db.Column(db.String(20), nullable=False, default='En Proceso') #En Proceso, Pendiente, Pagada, Anulada, Credito, Con Devolución
 
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'))
     notas = db.Column(db.Text, nullable=True)
@@ -25,6 +25,6 @@ class Venta(db.Model):
     productos_asociados = db.relationship('VentaProducto', back_populates='venta', cascade="all, delete-orphan")
 
     plan_pagos = db.relationship('PlanPago', backref='venta', lazy='dynamic', cascade="all, delete-orphan")
-
+    devoluciones = db.relationship('Devolucion', backref='venta', lazy='dynamic', cascade="all, delete-orphan")
     def __repr__(self):
         return f'<Venta {self.id}>'
