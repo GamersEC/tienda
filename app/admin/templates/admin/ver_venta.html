@@ -270,6 +270,22 @@
             <i class="fas fa-arrow-left me-2"></i> Volver a la Lista
         </a>
         <div>
+            {% if venta.tipo_pago == 'Credito' %}
+            <a href="{{ url_for('admin.generar_plan_pago', id=venta.id) }}" class="btn btn-info me-2">
+                <i class="fas fa-tasks me-2"></i> Generar Plan de Pagos
+            </a>
+            {% endif %}
+
+            <a href="{{ url_for('admin.generar_recibo_venta', id=venta.id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-file-alt me-2"></i> Recibo / Estado de Cuenta
+            </a>
+            {% if venta.estado == 'Pagada' %}
+            <a href="{{ url_for('admin.generar_factura_venta', id=venta.id) }}" class="btn btn-primary ms-2">
+                <i class="fas fa-file-invoice-dollar me-2"></i> Factura Final
+            </a>
+            {% endif %}
+        </div>
+    </div>
             <a href="{{ url_for('admin.generar_recibo_venta', id=venta.id) }}" class="btn btn-outline-primary">
                 <i class="fas fa-file-alt me-2"></i> Recibo / Estado de Cuenta
             </a>

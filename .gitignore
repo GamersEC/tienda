@@ -26,3 +26,4 @@ instance/
 # Archivos generados y subidos por el usuario
 app/static/uploads/
 app/static/receipts/
+app/static/credit_plans

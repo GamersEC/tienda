@@ -101,14 +101,15 @@ def configuracion_tienda():
 
     form = ConfiguracionForm(obj=config)
     if form.validate_on_submit():
-        config.nombre_tienda = form.nombre_tienda.data
-        config.ruc = form.ruc.data
-        config.telefono = form.telefono.data
-        config.direccion = form.direccion.data
-        config.email = form.email.data
-        logo_file = form.logo.data
+        #Guardar todos los campos del formulario en el objeto de configuración
+        form.populate_obj(config)
 
+        logo_file = form.logo.data
         if logo_file:
+            #Eliminar logo anterior si existe para no acumular archivos
+            if config.logo_path and os.path.exists(os.path.join(current_app.static_folder, config.logo_path)):
+                os.remove(os.path.join(current_app.static_folder, config.logo_path))
+
             filename = secure_filename(f"{uuid.uuid4().hex}_{logo_file.filename}")
             upload_dir = os.path.join(current_app.static_folder, 'uploads', 'logos')
             os.makedirs(upload_dir, exist_ok=True)
@@ -945,6 +946,67 @@ def generar_factura_venta(id):
     image_path = url_for('static', filename=os.path.join('receipts', filename))
     timestamp = datetime.utcnow().timestamp()
 
+    destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
+
+    return redirect(destination_url)
+
+@bp.route('/ventas/<int:id>/generar_plan_pago')
+@login_required
+def generar_plan_pago(id):
+    venta = Venta.query.get_or_404(id)
+    if venta.tipo_pago != 'Credito':
+        flash('Esta función solo está disponible para ventas a crédito.', 'warning')
+        return redirect(url_for('admin.ver_venta', id=id))
+
+    config = Configuracion.obtener_config()
+
+    #Cálculos para el resumen
+    monto_a_financiar = venta.monto_total - (venta.abono_inicial or 0)
+    total_intereses = sum(cuota.monto_interes for cuota in venta.plan_pagos)
+    valor_total_credito = monto_a_financiar + total_intereses
+    tasa_interes = 0
+    if venta.frecuencia_cuotas == 'Diaria':
+        tasa_interes = config.interes_diario
+    elif venta.frecuencia_cuotas == 'Semanal':
+        tasa_interes = config.interes_semanal
+    elif venta.frecuencia_cuotas == 'Mensual':
+        tasa_interes = config.interes_mensual
+
+    logo_url = None
+    if config and config.logo_path:
+        path_absoluto = os.path.join(current_app.static_folder, config.logo_path)
+        logo_url = f"file://{path_absoluto}"
+
+    html_out = render_template(
+        'admin/credit/plan_pago_template.html',
+        venta=venta,
+        tienda_config=config,
+        logo_url=logo_url,
+        now=datetime.utcnow(),
+        monto_a_financiar=monto_a_financiar,
+        total_intereses=total_intereses,
+        valor_total_credito=valor_total_credito,
+        tasa_interes=tasa_interes
+    )
+
+    #Generación de la imagen
+    output_dir = os.path.join(current_app.static_folder, 'credit_plans')
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f'plan_pago_venta_{venta.id}.png'
+    filepath = os.path.join(output_dir, filename)
+
+    try:
+        _generar_imagen_weasyprint(html_out, filepath)
+    except Exception as e:
+        flash(f'Error al generar la imagen del plan de pagos: {e}', 'danger')
+        current_app.logger.error(f"Error en generar_plan_pago: {e}", exc_info=True)
+        return redirect(url_for('admin.ver_venta', id=id))
+
+    flash('¡Imagen del plan de pagos generada exitosamente!', 'success')
+
+    #Redirigir de vuelta a la vista de la venta con la URL de la imagen para mostrarla
+    image_path = url_for('static', filename=os.path.join('credit_plans', filename))
+    timestamp = datetime.utcnow().timestamp()
     destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
 
     return redirect(destination_url)

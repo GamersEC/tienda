@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Plan de Pagos</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px;
+            font-size: 12px;
+            color: #333;
+        }
+        .container {
+            border: 1px solid #eee;
+            padding: 20px;
+            width: 700px; /* Ancho fijo para consistencia */
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header img {
+            max-width: 150px;
+            max-height: 75px;
+        }
+        .header .shop-info {
+            text-align: right;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .details, .summary {
+            margin-bottom: 20px;
+        }
+        .details table, .summary table, .payment-plan table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details td, .summary td {
+            padding: 5px;
+        }
+        .payment-plan h3 {
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        .payment-plan th, .payment-plan td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .payment-plan th {
+            background-color: #f2f2f2;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            {% if logo_url %}
+            <img src="{{ logo_url }}" alt="Logo">
+            {% endif %}
+            <h1>Plan de Pagos</h1>
+        </div>
+        <div class="shop-info">
+            <strong>{{ tienda_config.nombre_tienda }}</strong><br>
+            {{ tienda_config.direccion or '' }}<br>
+            RUC: {{ tienda_config.ruc or '' }}<br>
+            Tel: {{ tienda_config.telefono or '' }}
+        </div>
+    </div>
+
+    <div class="details">
+        <table>
+            <tr>
+                <td><strong>Cliente:</strong></td>
+                <td>{{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</td>
+                <td><strong>Fecha de Emisión:</strong></td>
+                <td class="text-right">{{ now.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            <tr>
+                <td><strong>Cédula/RUC:</strong></td>
+                <td>{{ venta.cliente.identificacion or 'N/A' }}</td>
+                <td><strong>Venta ID:</strong></td>
+                <td class="text-right">#{{ venta.id }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="summary">
+        <h3>Resumen del Crédito</h3>
+        <table>
+            <tr>
+                <td>Monto Total de la Venta:</td>
+                <td class="text-right">${{ "%.2f"|format(venta.monto_total) }}</td>
+            </tr>
+            <tr>
+                <td>Abono Inicial:</td>
+                <td class="text-right">-${{ "%.2f"|format(venta.abono_inicial) }}</td>
+            </tr>
+            <tr style="font-weight: bold; border-top: 1px solid #ccc;">
+                <td>Monto Total a Financiar (Capital):</td>
+                <td class="text-right">${{ "%.2f"|format(monto_a_financiar) }}</td>
+            </tr>
+            <tr style="color: #555;">
+                <td>Tasa de Interés Aplicada:</td>
+                <td class="text-right">{{ tasa_interes }}% {{ venta.frecuencia_cuotas }}</td>
+            </tr>
+            <tr style="color: #555;">
+                <td>Total de Intereses a Pagar:</td>
+                <td class="text-right">${{ "%.2f"|format(total_intereses) }}</td>
+            </tr>
+            <tr style="font-weight: bold; background-color: #f2f2f2;">
+                <td>Valor Total del Crédito (Capital + Intereses):</td>
+                <td class="text-right">${{ "%.2f"|format(valor_total_credito) }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="payment-plan">
+        <h3>Detalle de Cuotas</h3>
+        <table>
+            <thead>
+            <tr>
+                <th># Cuota</th>
+                <th>Fecha de Vencimiento</th>
+                <th>Monto a Pagar</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for cuota in venta.plan_pagos %}
+            <tr>
+                <td>{{ cuota.numero_cuota }}</td>
+                <td>{{ cuota.fecha_vencimiento.strftime('%Y-%m-%d') }}</td>
+                <td style="font-weight: bold;">${{ "%.2f"|format(cuota.monto_total_cuota) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Este es un plan de pagos informativo. El no cumplimiento de las fechas de pago puede incurrir en cargos adicionales.</p>
+        <p>&copy; {{ now.year }} {{ tienda_config.nombre_tienda }}</p>
+    </div>
+</div>
+</body>
+</html>
