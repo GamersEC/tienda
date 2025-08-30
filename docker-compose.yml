@@ -3,11 +3,8 @@ services:
     build: .
     ports:
       - "5000:5000"
-    # El volumen está bien para desarrollo, pero en producción,
-    # el código debería estar "cocinado" dentro de la imagen.
-    # Por ahora lo dejamos, pero es bueno saberlo.
-    # volumes:
-    #   - .:/app
+    volumes:
+    - .:/app
     env_file:
       - .env
     depends_on:
