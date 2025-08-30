@@ -22,3 +22,7 @@ instance/
 
 # Other
 .env
+
+# Archivos generados y subidos por el usuario
+app/static/uploads/
+app/static/receipts/
