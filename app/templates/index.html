@@ -1,10 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block content %}
+<main>
+    <div class="container py-5 text-center">
+        <div class="row">
+            <div class="col-lg-6 col-md-8 mx-auto">
+                <!-- Puedes poner un logo aquí si quieres -->
+                <!-- <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mi Tienda" class="mb-4" width="100"> -->
+
+                <h1 class="display-4 fw-light">Sistema de Gestión de Tienda</h1>
+                <p class="lead text-muted">
+                    Bienvenido a la plataforma centralizada para administrar productos,
+                    clientes, ventas y configuraciones de su negocio.
+                </p>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg mt-3">
+                    Acceder al Sistema
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
