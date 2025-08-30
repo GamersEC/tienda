@@ -79,6 +79,7 @@
                 <li><a class="dropdown-item {% if request.endpoint == 'admin.listar_tipos_producto' %}active{% endif %}" href="{{ url_for('admin.listar_tipos_producto') }}">Tipos de Producto</a></li>
                 <li><a class="dropdown-item {% if 'categoria_gasto' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.listar_categorias_gasto') }}">Categorías de Gasto</a></li>
                 <li><a class="dropdown-item {% if request.endpoint == 'admin.configuracion_tienda' %}active{% endif %}" href="{{ url_for('admin.configuracion_tienda') }}">Configuración Tienda</a></li>
+                <li><a class="dropdown-item {% if request.endpoint == 'admin.configuracion_intereses' %}active{% endif %}" href="{{ url_for('admin.configuracion_intereses') }}">Tasas de Interés</a></li>
                 <li><hr class="dropdown-divider"></li>
                 {% endif %}
                 <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>

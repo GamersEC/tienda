@@ -1,0 +1,60 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo }}</h1>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <p class="text-muted">
+            Define los porcentajes de interés que se aplicarán a las ventas a crédito. Estos valores se usarán para
+            calcular automáticamente los planes de pago. Introduce los valores como porcentajes (ej. "5" para 5%).
+        </p>
+        <form method="POST" novalidate>
+            {{ form.hidden_tag() }}
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    {{ form.interes_diario.label(class="form-label") }}
+                    <div class="input-group">
+                        {{ form.interes_diario(class="form-control") }}
+                        <span class="input-group-text">%</span>
+                    </div>
+                    {% for error in form.interes_diario.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.interes_semanal.label(class="form-label") }}
+                    <div class="input-group">
+                        {{ form.interes_semanal(class="form-control") }}
+                        <span class="input-group-text">%</span>
+                    </div>
+                    {% for error in form.interes_semanal.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.interes_mensual.label(class="form-label") }}
+                    <div class="input-group">
+                        {{ form.interes_mensual(class="form-control") }}
+                        <span class="input-group-text">%</span>
+                    </div>
+                    {% for error in form.interes_mensual.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-end">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

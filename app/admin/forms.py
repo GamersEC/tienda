@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
 from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField, FileField
-from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional
+from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional, InputRequired
 from wtforms_sqlalchemy.fields import QuerySelectField
 from app.models.cliente import Cliente
 from app.models.categoria_gasto import CategoriaGasto
@@ -121,3 +121,10 @@ class GastoForm(FlaskForm):
                                  allow_blank=False,
                                  validators=[DataRequired()])
     submit = SubmitField('Guardar Gasto')
+
+
+class InteresForm(FlaskForm):
+    interes_diario = DecimalField('Interés Diario (%)', validators=[InputRequired(message="Este campo es requerido."), NumberRange(min=0)])
+    interes_semanal = DecimalField('Interés Semanal (%)', validators=[InputRequired(message="Este campo es requerido."), NumberRange(min=0)])
+    interes_mensual = DecimalField('Interés Mensual (%)', validators=[InputRequired(message="Este campo es requerido."), NumberRange(min=0)])
+    submit = SubmitField('Guardar Tasas de Interés')
