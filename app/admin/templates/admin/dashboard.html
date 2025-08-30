@@ -3,84 +3,212 @@
 {% block title %}{{ titulo }}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Dashboard</h2>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard Analítico</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary">Últimos 30 días</button>
+        </div>
+    </div>
+</div>
 
-<!-- Fila de Tarjetas de Estadísticas Principales -->
+<!-- Fila de Tarjetas de Resumen Rápido -->
 <div class="row g-4 mb-4">
     <div class="col-md-6 col-lg-3">
         <div class="card bg-primary text-white h-100 shadow-sm">
-            <div class="card-body text-center">
+            <div class="card-body">
                 <h5 class="card-title"><i class="fas fa-dollar-sign"></i> Ingresos de Hoy</h5>
-                <p class="display-4 fw-bold">${{ "%.2f"|format(ingresos_hoy) }}</p>
+                <p class="display-6 fw-bold">${{ "%.2f"|format(ingresos_hoy) }}</p>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-lg-3">
         <div class="card bg-info text-white h-100 shadow-sm">
-            <div class="card-body text-center">
+            <div class="card-body">
                 <h5 class="card-title"><i class="fas fa-shopping-cart"></i> Ventas de Hoy</h5>
-                <p class="display-4 fw-bold">{{ ventas_hoy }}</p>
+                <p class="display-6 fw-bold">{{ ventas_hoy }}</p>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-lg-3">
-        <div class="card bg-success text-white h-100 shadow-sm">
-            <div class="card-body text-center">
-                <h5 class="card-title"><i class="fas fa-users"></i> Clientes Totales</h5>
-                <p class="display-4 fw-bold">{{ total_clientes }}</p>
+        <div class="card bg-danger text-white h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-receipt"></i> Gastos de Hoy</h5>
+                <p class="display-6 fw-bold">${{ "%.2f"|format(gastos_hoy) }}</p>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-lg-3">
-        <div class="card bg-secondary text-white h-100 shadow-sm">
-            <div class="card-body text-center">
-                <h5 class="card-title"><i class="fas fa-box"></i> Productos Totales</h5>
-                <p class="display-4 fw-bold">{{ total_productos }}</p>
+        <div class="card bg-dark text-white h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-chart-line"></i> Beneficio Neto (30d)</h5>
+                <p class="display-6 fw-bold">${{ "%.2f"|format(beneficio_neto_mes) }}</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Fila de Listas -->
+
+<!-- Gráfico de Ventas -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Ventas en los Últimos 30 Días</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="salesChart" width="400" height="120"></canvas>
+    </div>
+</div>
+
+<!-- Fila de Tablas "Top" y Listas de Alertas -->
 <div class="row g-4">
-    <div class="col-lg-7">
-        <div class="card shadow-sm">
-            <div class="card-header"><h5 class="mb-0">Últimas Ventas Registradas</h5></div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for venta in ultimas_ventas %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>#{{ venta.id }}</strong> - {{ venta.cliente.nombre }}
-                            <br><small class="text-muted">{{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</small>
-                        </div>
-                        <span class="badge bg-primary rounded-pill">${{ "%.2f"|format(venta.monto_total) }}</span>
-                    </li>
+    <div class="col-lg-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white"><h5 class="mb-0">Top 5 Productos Vendidos</h5></div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                    <tr><th>Producto</th><th class="text-end">Cantidad</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for producto, total_cantidad in top_productos %}
+                    <tr>
+                        <td>{{ producto.nombre }}</td>
+                        <td class="text-end fw-bold">{{ total_cantidad }}</td>
+                    </tr>
                     {% else %}
-                    <li class="list-group-item text-center">No hay ventas recientes.</li>
+                    <tr><td colspan="2" class="text-center">No hay datos suficientes.</td></tr>
                     {% endfor %}
-                </ul>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-
-    <div class="col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-warning"><h5 class="mb-0">Productos con Bajo Stock (<= 5)</h5></div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for producto in productos_bajo_stock %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ producto.nombre }}
-                        <span class="badge bg-danger rounded-pill">{{ producto.stock }}</span>
-                    </li>
+    <div class="col-lg-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white"><h5 class="mb-0">Top 5 Clientes</h5></div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                    <tr><th>Cliente</th><th class="text-end">Total Gastado</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for cliente, total_gastado in top_clientes %}
+                    <tr>
+                        <td>{{ cliente.nombre }} {{ cliente.apellido or ''}}</td>
+                        <td class="text-end fw-bold">${{ "%.2f"|format(total_gastado) }}</td>
+                    </tr>
                     {% else %}
-                    <li class="list-group-item text-center">¡Todo el inventario está bien!</li>
+                    <tr><td colspan="2" class="text-center">No hay datos suficientes.</td></tr>
                     {% endfor %}
-                </ul>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-danger text-white"><h5 class="mb-0">Top 5 Categorías de Gasto</h5></div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                    <tr><th>Categoría</th><th class="text-end">Total Gastado</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for categoria, total_gastado in top_categorias_gasto %}
+                    <tr>
+                        <td>{{ categoria }}</td>
+                        <td class="text-end fw-bold">${{ "%.2f"|format(total_gastado) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-center">No hay gastos registrados.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-warning"><h5 class="mb-0">Productos con Bajo Stock</h5></div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                    <tr><th>Producto</th><th class="text-end">Stock</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for producto in productos_bajo_stock %}
+                    <tr>
+                        <td>{{ producto.nombre }}</td>
+                        <td class="text-end text-danger fw-bold">{{ producto.stock }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-center">Inventario en orden.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('salesChart').getContext('2d');
+
+        // Pasamos los datos desde Flask al Javascript de forma segura
+        const chartLabels = {{ chart_labels | tojson | safe }};
+        const chartData = {{ chart_data | tojson | safe }};
+
+        const salesChart = new Chart(ctx, {
+            type: 'bar', // Puedes cambiar a 'line' para un gráfico de líneas
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Ingresos por Día ($)',
+                    data: chartData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            // Formatear el eje Y como moneda
+                            callback: function(value, index, values) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

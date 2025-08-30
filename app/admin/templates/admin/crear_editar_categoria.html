@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo }}</h1>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="POST" novalidate>
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+                {{ form.nombre.label(class="form-label") }}
+                {{ form.nombre(class="form-control", placeholder="Ej: Marketing, Proveedores, Alquiler...") }}
+                {% for error in form.nombre.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-end">
+                <a href="{{ url_for('admin.listar_categorias_gasto') }}" class="btn btn-secondary me-2">Cancelar</a>
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

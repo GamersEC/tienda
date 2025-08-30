@@ -55,7 +55,7 @@ def create_app(config_class=Config):
     # -----------------------------------------------------------
     from app.models import (
         producto, cliente, venta, pago, venta_producto, usuario,
-        tipo_producto, atributo, valor_atributo_producto, configuracion
+        tipo_producto, atributo, valor_atributo_producto, configuracion, gasto, categoria_gasto
     )
 
     return app
