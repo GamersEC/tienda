@@ -13,7 +13,7 @@ class ClienteForm(FlaskForm):
     identificacion = StringField('Cédula / RUC')
     telefono = StringField('Teléfono')
     email = StringField('Email')
-    direccion = StringField('Dirección (Calles)')
+    direccion = StringField('Dirección')
     ciudad = StringField('Ciudad')
     submit = SubmitField('Guardar Cliente')
 
@@ -145,3 +145,13 @@ class CreditoForm(FlaskForm):
     ])
 
     submit = SubmitField('Finalizar Venta y Generar Plan')
+
+
+class PagoCuotaForm(FlaskForm):
+    monto_pago = DecimalField('Monto a Pagar', validators=[InputRequired(), NumberRange(min=0.01)])
+    metodo_pago = SelectField('Método de Pago', choices=[('Efectivo', 'Efectivo'), ('Transferencia', 'Transferencia')], validators=[DataRequired()])
+    comprobante = FileField('Comprobante de Pago (Opcional)', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
+    ])
+    submit = SubmitField('Registrar Pago de Cuota')

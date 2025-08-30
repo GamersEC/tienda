@@ -40,7 +40,7 @@ from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
     OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm,
-    GastoForm, CategoriaGastoForm, InteresForm, CreditoForm
+    GastoForm, CategoriaGastoForm, InteresForm, CreditoForm, PagoCuotaForm
 )
 
 #Calcular el plan de pagos para ventas a crédito
@@ -759,12 +759,19 @@ def finalizar_venta(id):
     flash('Esta acción ha sido movida a la página de edición de venta.', 'info')
     return redirect(url_for('admin.editar_venta', id=id))
 
+
 @bp.route('/ventas/<int:id>')
 def ver_venta(id):
     venta = Venta.query.get_or_404(id)
     pago_form = PagoForm()
+    pago_cuota_form = PagoCuotaForm()
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
-    return render_template('admin/ver_venta.html', venta=venta, pago_form=pago_form, total_pagado=total_pagado)
+
+    return render_template('admin/ver_venta.html',
+                           venta=venta,
+                           pago_form=pago_form,
+                           total_pagado=total_pagado,
+                           pago_cuota_form=pago_cuota_form)
 
 @bp.route('/ventas/<int:id>/pagar', methods=['POST'])
 def agregar_pago(id):
@@ -835,6 +842,62 @@ def anular_venta(id):
 
     return redirect(url_for('admin.listar_ventas'))
 
+@bp.route('/plan_pago/<int:cuota_id>/pagar', methods=['POST'])
+@login_required
+def pagar_cuota(cuota_id):
+    cuota = PlanPago.query.get_or_404(cuota_id)
+    venta = cuota.venta
+    form = PagoCuotaForm()
+
+    if form.validate_on_submit():
+        monto_pagado = form.monto_pago.data
+
+        #Validación para no pagar de más en una cuota
+        if monto_pagado > cuota.monto_total_cuota and not isclose(monto_pagado, cuota.monto_total_cuota):
+            flash(f'El monto a pagar (${monto_pagado}) no puede ser mayor al valor de la cuota (${cuota.monto_total_cuota}).', 'danger')
+            return redirect(url_for('admin.ver_venta', id=venta.id))
+
+        #Crear el nuevo registro de pago
+        nuevo_pago = Pago(
+            monto_pago=monto_pagado,
+            metodo_pago=form.metodo_pago.data,
+            venta_id=venta.id
+        )
+
+        comprobante_file = form.comprobante.data
+        if comprobante_file:
+            filename = secure_filename(f"{uuid.uuid4().hex}_{comprobante_file.filename}")
+            upload_dir = os.path.join(current_app.static_folder, 'uploads', 'comprobantes')
+            os.makedirs(upload_dir, exist_ok=True)
+            filepath = os.path.join(upload_dir, filename)
+            comprobante_file.save(filepath)
+            nuevo_pago.comprobante_path = os.path.join('uploads', 'comprobantes', filename)
+
+        db.session.add(nuevo_pago)
+        db.session.flush()
+
+        #Actualizar el estado de la cuota y enlazarla al pago
+        cuota.estado = 'Pagada'
+        cuota.pago_id = nuevo_pago.id
+
+        #Verificar si todas las cuotas ya están pagadas para actualizar la venta
+        todas_pagadas = True
+        for c in venta.plan_pagos:
+            if c.estado != 'Pagada':
+                todas_pagadas = False
+                break
+
+        if todas_pagadas:
+            venta.estado = 'Pagada'
+
+        db.session.commit()
+        flash(f'Pago para la cuota #{cuota.numero_cuota} registrado exitosamente.', 'success')
+    else:
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"Error en el campo '{getattr(form, field).label.text}': {error}", 'danger')
+
+    return redirect(url_for('admin.ver_venta', id=venta.id))
 
 def _generar_imagen_weasyprint(html_string, output_path):
     try:
@@ -872,32 +935,41 @@ def generar_recibo_venta(id):
         path_absoluto = os.path.join(current_app.static_folder, config.logo_path)
         logo_url = f"file://{path_absoluto}"
 
+    #Lógica condicional para elegir la plantilla correcta
+    if venta.tipo_pago == 'Credito':
+        template_name = 'admin/receipts/estado_cuenta_template.html'
+        document_name = f'estado_cuenta_venta_{venta.id}.png'
+        flash_message = '¡Estado de cuenta generado exitosamente!'
+    else:
+        template_name = 'admin/receipts/receipt_template.html'
+        document_name = f'recibo_venta_{venta.id}.png'
+        flash_message = '¡Recibo en imagen generado exitosamente!'
+
     html_out = render_template(
-        'admin/receipts/receipt_template.html',
+        template_name,
         venta=venta,
         total_pagado=total_pagado,
         pagos=pagos,
         tienda_config=config,
-        logo_url=logo_url
+        logo_url=logo_url,
+        now=datetime.utcnow()
     )
 
-    receipts_dir = os.path.join(current_app.static_folder, 'receipts')
-    os.makedirs(receipts_dir, exist_ok=True)
-    filename = f'recibo_venta_{venta.id}.png'
-    filepath = os.path.join(receipts_dir, filename)
+    output_dir = os.path.join(current_app.static_folder, 'receipts')
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, document_name)
 
     try:
         _generar_imagen_weasyprint(html_out, filepath)
     except Exception as e:
-        flash(f'Error al generar la imagen del recibo: {e}', 'danger')
+        flash(f'Error al generar la imagen del documento: {e}', 'danger')
         current_app.logger.error(f"Error en generar_recibo_venta: {e}", exc_info=True)
         return redirect(url_for('admin.ver_venta', id=id))
 
-    flash('¡Recibo en imagen generado exitosamente!', 'success')
+    flash(flash_message, 'success')
 
-    image_path = url_for('static', filename=os.path.join('receipts', filename))
+    image_path = url_for('static', filename=os.path.join('receipts', document_name))
     timestamp = datetime.utcnow().timestamp()
-
     destination_url = f"{url_for('admin.ver_venta', id=id)}?generated_image_url={image_path}&v={timestamp}"
 
     return redirect(destination_url)
