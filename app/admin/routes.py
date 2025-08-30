@@ -33,13 +33,60 @@ from app.models.valor_atributo_producto import ValorAtributoProducto
 from app.models.configuracion import Configuracion
 from app.models.gasto import Gasto
 from app.models.categoria_gasto import CategoriaGasto
+from app.models.plan_pago import PlanPago
 
 #Importación de todos los Formularios
 from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
-    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm, GastoForm, CategoriaGastoForm, InteresForm
+    OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm,
+    GastoForm, CategoriaGastoForm, InteresForm, CreditoForm
 )
+
+#Calcular el plan de pagos para ventas a crédito
+def _calcular_plan_de_pagos(monto_venta, abono_inicial, numero_cuotas, frecuencia, config):
+    if numero_cuotas == 0:
+        return []
+
+    capital_a_financiar = Decimal(monto_venta) - Decimal(abono_inicial)
+    tasa_interes = Decimal('0.0')
+
+    if frecuencia == 'Diaria':
+        tasa_interes = config.interes_diario / Decimal('100.0')
+    elif frecuencia == 'Semanal':
+        tasa_interes = config.interes_semanal / Decimal('100.0')
+    elif frecuencia == 'Mensual':
+        tasa_interes = config.interes_mensual / Decimal('100.0')
+
+    interes_total = capital_a_financiar * tasa_interes * Decimal(numero_cuotas)
+    total_a_pagar = capital_a_financiar + interes_total
+
+    monto_total_cuota = total_a_pagar / Decimal(numero_cuotas)
+    capital_por_cuota = capital_a_financiar / Decimal(numero_cuotas)
+    interes_por_cuota = interes_total / Decimal(numero_cuotas)
+
+    plan_pagos = []
+    fecha_actual = datetime.utcnow()
+
+    for i in range(1, numero_cuotas + 1):
+        fecha_vencimiento = fecha_actual
+        if frecuencia == 'Diaria':
+            fecha_vencimiento += timedelta(days=i)
+        elif frecuencia == 'Semanal':
+            fecha_vencimiento += timedelta(weeks=i)
+        elif frecuencia == 'Mensual':
+            fecha_vencimiento += timedelta(days=30 * i)
+
+        cuota = {
+            'numero_cuota': i,
+            'monto_capital': capital_por_cuota,
+            'monto_interes': interes_por_cuota,
+            'monto_total_cuota': monto_total_cuota,
+            'fecha_vencimiento': fecha_vencimiento
+        }
+        plan_pagos.append(cuota)
+
+    return plan_pagos
 
 
 @bp.route('/configuracion', methods=['GET', 'POST'])
@@ -80,7 +127,7 @@ def configuracion_tienda():
 def configuracion_intereses():
     config = Configuracion.obtener_config()
     if not config:
-        # En el caso improbable de que no exista, la creamos
+        #En el caso improbable de que no exista, la creamos
         config = Configuracion()
         db.session.add(config)
         db.session.commit()
@@ -370,7 +417,7 @@ def editar_producto(id):
 @admin_required
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
-    #También eliminamos las asociaciones de ventas para mantener la integridad
+    #Eliminamos las asociaciones de ventas para mantener la integridad
     VentaProducto.query.filter_by(producto_id=id).delete()
     ValorAtributoProducto.query.filter_by(producto_id=id).delete()
     db.session.delete(producto)
@@ -577,10 +624,10 @@ def crear_venta():
         )
         db.session.add(nueva_venta)
         db.session.commit()
-        flash('Venta iniciada. Ahora añade productos.', 'success')
+        flash('Venta iniciada. Ahora añade productos y define los términos de pago.', 'success')
         return redirect(url_for('admin.editar_venta', id=nueva_venta.id))
 
-    return render_template('admin/crear_venta.html', form=form)
+    return render_template('admin/crear_venta.html', form=form, titulo='Iniciar Nueva Venta')
 
 @bp.route('/ventas/editar/<int:id>', methods=['GET', 'POST'])
 def editar_venta(id):
@@ -591,44 +638,109 @@ def editar_venta(id):
 
     anular_venta_form = AnularVentaForm()
     agregar_producto_form = AgregarProductoVentaForm()
-    editar_venta_form = EditarVentaForm(obj=venta)
+    credito_form = CreditoForm(obj=venta)
+
+    #Cargar productos con atributos
     productos_disponibles = Producto.query.filter(Producto.stock > 0).order_by(Producto.nombre).all()
-    agregar_producto_form.producto.query = productos_disponibles
+    opciones_productos = []
+    for p in productos_disponibles:
+        atributos_str = ", ".join(
+            f"{val.atributo.nombre_atributo}: {val.valor}" for val in p.valores_atributos
+        )
+        texto_opcion = f"{p.nombre} ({atributos_str})" if atributos_str else p.nombre
+        opciones_productos.append((p.id, texto_opcion))
+
+    #Asignamos las nuevas opciones al campo 'producto' del formulario
+    agregar_producto_form.producto.choices = opciones_productos
+
     stock_data = {str(p.id): p.stock for p in productos_disponibles}
 
-    if request.method == 'POST':
-        if 'submit_notas' in request.form and editar_venta_form.validate():
-            venta.notas = editar_venta_form.notas.data
+    if 'submit_producto' in request.form and agregar_producto_form.validate():
+        #Lógica para añadir producto
+        producto_id = agregar_producto_form.producto.data
+        producto = Producto.query.get(producto_id)
+        cantidad_a_vender = agregar_producto_form.cantidad.data
+
+        if cantidad_a_vender > producto.stock:
+            flash(f'No se puede añadir. Solo quedan {producto.stock} unidades de "{producto.nombre}".', 'danger')
+        else:
+            asociacion_existente = VentaProducto.query.filter_by(venta_id=venta.id, producto_id=producto.id).first()
+            if asociacion_existente:
+                asociacion_existente.cantidad += cantidad_a_vender
+            else:
+                asociacion_existente = VentaProducto(venta_id=venta.id, producto_id=producto.id, cantidad=cantidad_a_vender, precio_unitario=producto.precio)
+                db.session.add(asociacion_existente)
+            producto.stock -= cantidad_a_vender
             db.session.commit()
-            flash('Notas actualizadas.', 'success')
+            flash(f'{cantidad_a_vender} x "{producto.nombre}" añadido(s) a la venta.', 'success')
+        return redirect(url_for('admin.editar_venta', id=id))
+
+    if 'submit_credito' in request.form and credito_form.validate():
+        if not venta.productos_asociados:
+            flash('No se puede finalizar una venta sin productos.', 'danger')
             return redirect(url_for('admin.editar_venta', id=id))
 
-        if 'submit_producto' in request.form and agregar_producto_form.validate():
-            producto = agregar_producto_form.producto.data
-            cantidad_a_vender = agregar_producto_form.cantidad.data
-            if cantidad_a_vender > producto.stock:
-                flash(f'No se puede añadir. Solo quedan {producto.stock} unidades de "{producto.nombre}".', 'danger')
-            else:
-                asociacion_existente = VentaProducto.query.filter_by(venta_id=venta.id, producto_id=producto.id).first()
-                if asociacion_existente:
-                    asociacion_existente.cantidad += cantidad_a_vender
-                else:
-                    asociacion_existente = VentaProducto(venta_id=venta.id, producto_id=producto.id, cantidad=cantidad_a_vender, precio_unitario=producto.precio)
-                    db.session.add(asociacion_existente)
-                producto.stock -= cantidad_a_vender
-                db.session.commit()
-                flash(f'{cantidad_a_vender} x "{producto.nombre}" añadido(s) a la venta.', 'success')
-            return redirect(url_for('admin.editar_venta', id=id))
+        venta.tipo_pago = credito_form.tipo_pago.data
+        if venta.tipo_pago == 'Credito':
+            if not credito_form.numero_cuotas.data or not credito_form.frecuencia_cuotas.data:
+                flash('El número y la frecuencia de cuotas son requeridos para ventas a crédito.', 'danger')
+                return redirect(url_for('admin.editar_venta', id=id))
+
+            venta.numero_cuotas = credito_form.numero_cuotas.data
+            venta.frecuencia_cuotas = credito_form.frecuencia_cuotas.data
+            venta.abono_inicial = credito_form.abono_inicial.data or 0
+
+            config = Configuracion.obtener_config()
+            plan_calculado = _calcular_plan_de_pagos(
+                venta.monto_total, venta.abono_inicial, venta.numero_cuotas, venta.frecuencia_cuotas, config
+            )
+
+            for cuota_data in plan_calculado:
+                nueva_cuota = PlanPago(
+                    venta_id=venta.id,
+                    numero_cuota=cuota_data['numero_cuota'],
+                    monto_capital=cuota_data['monto_capital'],
+                    monto_interes=cuota_data['monto_interes'],
+                    monto_total_cuota=cuota_data['monto_total_cuota'],
+                    fecha_vencimiento=cuota_data['fecha_vencimiento']
+                )
+                db.session.add(nueva_cuota)
+
+            if venta.abono_inicial > 0:
+                abono = Pago(
+                    monto_pago=venta.abono_inicial,
+                    metodo_pago=credito_form.metodo_pago_abono.data,
+                    venta_id=venta.id
+                )
+                comprobante_file = credito_form.comprobante_abono.data
+                if comprobante_file:
+                    filename = secure_filename(f"{uuid.uuid4().hex}_{comprobante_file.filename}")
+                    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'comprobantes')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    filepath = os.path.join(upload_dir, filename)
+                    comprobante_file.save(filepath)
+                    abono.comprobante_path = os.path.join('uploads', 'comprobantes', filename)
+                db.session.add(abono)
+
+            venta.estado = 'Credito'
+            flash('Venta a crédito finalizada. Plan de pagos generado.', 'success')
+        else:
+            venta.estado = 'Pendiente'
+            flash('Venta de contado finalizada. Pendiente de pago.', 'success')
+
+        db.session.commit()
+        return redirect(url_for('admin.ver_venta', id=id))
 
     total_calculado = db.session.query(func.sum(VentaProducto.precio_unitario * VentaProducto.cantidad)).filter_by(venta_id=id).scalar() or 0
     venta.monto_total = total_calculado
     db.session.commit()
 
-    return render_template('admin/editar_venta.html', venta=venta,
+    return render_template('admin/editar_venta.html',
+                           venta=venta,
                            agregar_producto_form=agregar_producto_form,
-                           editar_venta_form=editar_venta_form,
-                           stock_data=stock_data,
-                           anular_venta_form=anular_venta_form)
+                           credito_form=credito_form,
+                           anular_venta_form=anular_venta_form,
+                           stock_data=stock_data)
 
 @bp.route('/ventas/editar/<int:venta_id>/eliminar_producto/<int:producto_asociado_id>', methods=['POST'])
 @admin_required
@@ -643,14 +755,8 @@ def eliminar_producto_venta(venta_id, producto_asociado_id):
 
 @bp.route('/ventas/finalizar/<int:id>', methods=['POST'])
 def finalizar_venta(id):
-    venta = Venta.query.get_or_404(id)
-    if venta.productos_asociados:
-        venta.estado = 'Pendiente'
-        db.session.commit()
-        flash('Venta finalizada. Ahora está pendiente de pago.', 'success')
-    else:
-        flash('No se puede finalizar una venta sin productos.', 'danger')
-    return redirect(url_for('admin.ver_venta', id=id))
+    flash('Esta acción ha sido movida a la página de edición de venta.', 'info')
+    return redirect(url_for('admin.editar_venta', id=id))
 
 @bp.route('/ventas/<int:id>')
 def ver_venta(id):
@@ -1001,3 +1107,38 @@ def eliminar_opcion_atributo(id):
     db.session.commit()
     flash('Opción eliminada.', 'success')
     return redirect(url_for('admin.detalle_tipo_producto', id=tipo_producto_id))
+
+
+# -----------------------------------------------------------------------------
+# --- RUTAS API ADICIONALES ---
+# -----------------------------------------------------------------------------
+@bp.route('/api/calcular-cuotas', methods=['POST'])
+@login_required
+def api_calcular_cuotas():
+    data = request.get_json()
+    monto_total = Decimal(data.get('monto_total', 0))
+    abono_inicial = Decimal(data.get('abono_inicial', 0))
+    numero_cuotas = int(data.get('numero_cuotas', 0))
+    frecuencia = data.get('frecuencia', '')
+
+    if monto_total <= 0 or numero_cuotas <= 0 or not frecuencia:
+        return jsonify({'error': 'Datos incompletos'}), 400
+
+    config = Configuracion.obtener_config()
+    if not config:
+        return jsonify({'error': 'Configuración de intereses no encontrada'}), 500
+
+    plan = _calcular_plan_de_pagos(monto_total, abono_inicial, numero_cuotas, frecuencia, config)
+
+    if not plan:
+        return jsonify({'valor_cuota': 0, 'total_financiado': 0, 'total_interes': 0})
+
+    valor_cuota = plan[0]['monto_total_cuota']
+    total_financiado = sum(c['monto_total_cuota'] for c in plan)
+    total_interes = sum(c['monto_interes'] for c in plan)
+
+    return jsonify({
+        'valor_cuota': float(valor_cuota),
+        'total_financiado': float(total_financiado),
+        'total_interes': float(total_interes)
+    })

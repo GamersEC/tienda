@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
-from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField, FileField
+from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField, FileField, RadioField
 from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional, InputRequired
 from wtforms_sqlalchemy.fields import QuerySelectField
 from app.models.cliente import Cliente
@@ -18,15 +18,14 @@ class ClienteForm(FlaskForm):
     submit = SubmitField('Guardar Cliente')
 
 
-# Función para obtener la lista de clientes para el formulario
+#Función para obtener la lista de clientes para el formulario
 def obtener_clientes():
     return Cliente.query.all()
 
 
 class VentaForm(FlaskForm):
-    cliente = QuerySelectField('Cliente', query_factory=obtener_clientes, get_label='nombre', allow_blank=False, validators=[DataRequired()])
+    cliente_id = StringField('Cliente', validators=[DataRequired()])
     submit = SubmitField('Iniciar Venta')
-
 
 class PagoForm(FlaskForm):
     monto_pago = DecimalField('Monto del Pago', validators=[DataRequired(), NumberRange(min=0.01)])
@@ -39,8 +38,7 @@ class PagoForm(FlaskForm):
 
 
 class AgregarProductoVentaForm(FlaskForm):
-    # Este formulario es especial porque llenaremos los productos dinámicamente
-    producto = QuerySelectField('Producto', get_label='nombre', allow_blank=False)
+    producto = SelectField('Producto', coerce=int, validators=[DataRequired()])
     cantidad = IntegerField('Cantidad', validators=[DataRequired(), NumberRange(min=1)], default=1)
     submit = SubmitField('Añadir Producto')
 
@@ -55,7 +53,7 @@ class UsuarioForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     rol = SelectField('Rol', choices=[('Vendedor', 'Vendedor'), ('Administrador', 'Administrador')], validators=[DataRequired()])
 
-    # Hacemos la contraseña opcional solo si el usuario ya existe (estamos editando)
+    #Hacemos la contraseña opcional solo si el usuario ya existe
     password = PasswordField('Contraseña', validators=[Optional(), EqualTo('password2', message='Las contraseñas deben coincidir.')])
     password2 = PasswordField('Confirmar Contraseña', validators=[Optional()])
 
@@ -128,3 +126,21 @@ class InteresForm(FlaskForm):
     interes_semanal = DecimalField('Interés Semanal (%)', validators=[InputRequired(message="Este campo es requerido."), NumberRange(min=0)])
     interes_mensual = DecimalField('Interés Mensual (%)', validators=[InputRequired(message="Este campo es requerido."), NumberRange(min=0)])
     submit = SubmitField('Guardar Tasas de Interés')
+
+
+class CreditoForm(FlaskForm):
+    tipo_pago = RadioField('Tipo de Pago', choices=[('Contado', 'Contado'), ('Credito', 'Crédito')], default='Contado', validators=[DataRequired()])
+
+    #Campos de Crédito
+    abono_inicial = DecimalField('Abono Inicial ($)', validators=[Optional(), NumberRange(min=0)], default=0)
+    numero_cuotas = IntegerField('Número de Cuotas', validators=[Optional(), NumberRange(min=1)])
+    frecuencia_cuotas = SelectField('Frecuencia', choices=[('', 'Seleccionar...'), ('Diaria', 'Diaria'), ('Semanal', 'Semanal'), ('Mensual', 'Mensual')], validators=[Optional()])
+
+    #Campos para el Abono
+    metodo_pago_abono = SelectField('Método de Pago del Abono', choices=[('Efectivo', 'Efectivo'), ('Transferencia', 'Transferencia')], validators=[Optional()])
+    comprobante_abono = FileField('Comprobante de Abono', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
+    ])
+
+    submit = SubmitField('Finalizar Venta y Generar Plan')

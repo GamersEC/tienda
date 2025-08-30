@@ -3,68 +3,88 @@
 {% block title %}Iniciar Nueva Venta{% endblock %}
 
 {% block content %}
-<h2>Iniciar Nueva Venta</h2>
-<p>Busca un cliente por nombre o cédula/RUC para comenzar.</p>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Iniciar Nueva Venta</h1>
+</div>
 
-<form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <!-- Este input oculto guardará el ID del cliente seleccionado -->
-    <input type="hidden" name="cliente_id" id="cliente_id" required>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            <!-- Este input oculto guardará el ID del cliente seleccionado -->
+            <input type="hidden" name="cliente_id" id="cliente_id" required>
 
-    <div class="mb-3">
-        <label for="search_cliente" class="form-label">Buscar Cliente</label>
-        <input type="text" id="search_cliente" class="form-control" placeholder="Escribe para buscar...">
+            <div class="mb-3">
+                <label for="search_cliente" class="form-label fw-bold">1. Buscar Cliente</label>
+                <p class="form-text">Busca un cliente por nombre, apellido o cédula/RUC para comenzar.</p>
+                <input type="text" id="search_cliente" class="form-control" placeholder="Escribe para buscar...">
+            </div>
+
+            <!-- Aquí se mostrarán los resultados de la búsqueda -->
+            <div id="search_results" class="list-group mb-3"></div>
+
+            <!-- Mostramos el cliente seleccionado -->
+            <div id="selected_client" class="alert alert-info" style="display: none;"></div>
+
+            <hr>
+            <p class="fw-bold">2. Iniciar Venta</p>
+            <p class="form-text">
+                Una vez seleccionado el cliente, podrás iniciar la venta. En el siguiente paso añadirás los productos
+                y definirás si el pago es de contado o a crédito.
+            </p>
+            <button type="submit" id="submit_button" class="btn btn-success" disabled>
+                <i class="fas fa-arrow-right"></i>
+                Continuar al Registro de Productos
+            </button>
+            <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-secondary">Cancelar</a>
+        </form>
     </div>
+</div>
+{% endblock %}
 
-    <!-- Aquí se mostrarán los resultados de la búsqueda -->
-    <div id="search_results" class="list-group mb-3"></div>
-
-    <!-- Mostramos el cliente seleccionado -->
-    <div id="selected_client" class="alert alert-info" style="display: none;"></div>
-
-    <button type="submit" id="submit_button" class="btn btn-success" disabled>Iniciar Venta</button>
-    <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-secondary">Cancelar</a>
-</form>
-
+{% block scripts %}
 <script>
-    const searchInput = document.getElementById('search_cliente');
-    const resultsDiv = document.getElementById('search_results');
-    const selectedClientDiv = document.getElementById('selected_client');
-    const hiddenInput = document.getElementById('cliente_id');
-    const submitButton = document.getElementById('submit_button');
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('search_cliente');
+        const resultsDiv = document.getElementById('search_results');
+        const selectedClientDiv = document.getElementById('selected_client');
+        const hiddenInput = document.getElementById('cliente_id');
+        const submitButton = document.getElementById('submit_button');
 
-    searchInput.addEventListener('input', async function() {
-        const query = this.value;
-        if (query.length < 2) {
+        searchInput.addEventListener('input', async function() {
+            const query = this.value;
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+
+            const response = await fetch(`{{ url_for('admin.buscar_clientes') }}?q=${query}`);
+            const clients = await response.json();
+
             resultsDiv.innerHTML = '';
-            return;
-        }
-
-        const response = await fetch(`{{ url_for('admin.buscar_clientes') }}?q=${query}`);
-        const clients = await response.json();
-
-        resultsDiv.innerHTML = '';
-        clients.forEach(client => {
-            const a = document.createElement('a');
-            a.href = '#';
-            a.className = 'list-group-item list-group-item-action';
-            a.textContent = client.text;
-            a.dataset.clientId = client.id;
-            a.addEventListener('click', function(e) {
-                e.preventDefault();
-                selectClient(client);
+            clients.forEach(client => {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.className = 'list-group-item list-group-item-action';
+                a.textContent = client.text;
+                a.dataset.clientId = client.id;
+                a.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    selectClient(client);
+                });
+                resultsDiv.appendChild(a);
             });
-            resultsDiv.appendChild(a);
         });
-    });
 
-    function selectClient(client) {
-        hiddenInput.value = client.id;
-        selectedClientDiv.textContent = `Cliente seleccionado: ${client.text}`;
-        selectedClientDiv.style.display = 'block';
-        resultsDiv.innerHTML = '';
-        searchInput.value = '';
-        submitButton.disabled = false;
-    }
+        function selectClient(client) {
+            hiddenInput.value = client.id;
+            selectedClientDiv.textContent = `Cliente seleccionado: ${client.text}`;
+            selectedClientDiv.style.display = 'block';
+            resultsDiv.innerHTML = '';
+            searchInput.value = '';
+            submitButton.disabled = false;
+            searchInput.disabled = true; // Opcional: deshabilita el buscador una vez seleccionado
+        }
+    });
 </script>
 {% endblock %}
