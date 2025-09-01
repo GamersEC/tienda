@@ -1,6 +1,10 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
-from wtforms import StringField, TextAreaField, DecimalField, IntegerField, SubmitField, SelectField, PasswordField, FileField, RadioField
+from wtforms import (
+    StringField, TextAreaField, DecimalField, IntegerField, SubmitField,
+    SelectField, PasswordField, FileField, RadioField, FormField, FieldList,
+    BooleanField, HiddenField
+)
 from wtforms.validators import DataRequired, NumberRange, Email, EqualTo, Optional, InputRequired
 from wtforms_sqlalchemy.fields import QuerySelectField
 from app.models.cliente import Cliente
@@ -155,3 +159,30 @@ class PagoCuotaForm(FlaskForm):
         FileAllowed(['jpg', 'jpeg', 'png'], '¡Solo se permiten imágenes!')
     ])
     submit = SubmitField('Registrar Pago de Cuota')
+
+
+class DevolucionProductoForm(FlaskForm):
+    producto_id = HiddenField()
+    cantidad_a_devolver = IntegerField('Cantidad a Devolver', default=0, validators=[NumberRange(min=0)])
+    devuelto_al_stock = BooleanField('Devolver al Stock', default=True)
+
+    class Meta:
+        csrf = False
+
+class DevolucionForm(FlaskForm):
+    productos = FieldList(FormField(DevolucionProductoForm))
+    motivo = TextAreaField('Motivo de la Devolución', validators=[Optional()], render_kw={"placeholder": "Ej: Producto defectuoso, talla incorrecta, etc."})
+    opcion_reembolso = RadioField('Opción de Reembolso', choices=[
+        ('NotaCredito', 'Generar Nota de Crédito (Saldo a Favor)'),
+        ('Reembolso', 'Reembolsar Dinero')
+    ], validators=[DataRequired()])
+
+    #Campos para Reembolso de Dinero
+    metodo_reembolso = SelectField('Método de Reembolso', choices=[('Efectivo', 'Efectivo'), ('Transferencia', 'Transferencia')], validators=[Optional()])
+    notas_reembolso = TextAreaField('Notas/Referencia del Reembolso', validators=[Optional()])
+    comprobante_reembolso = FileField('Comprobante de Reembolso', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png', 'pdf'], '¡Solo se permiten imágenes y PDF!')
+    ])
+
+    submit = SubmitField('Procesar Devolución')

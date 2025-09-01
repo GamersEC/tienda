@@ -40,7 +40,8 @@ from app.admin.forms import (
     ClienteForm, VentaForm, PagoForm, AgregarProductoVentaForm,
     EditarVentaForm, UsuarioForm, TipoProductoForm, AtributoForm,
     OpcionAtributoForm, EmptyForm, AnularVentaForm, ConfiguracionForm,
-    GastoForm, CategoriaGastoForm, InteresForm, CreditoForm, PagoCuotaForm
+    GastoForm, CategoriaGastoForm, InteresForm, CreditoForm, PagoCuotaForm,
+    DevolucionForm, DevolucionProductoForm
 )
 
 #Calcular el plan de pagos para ventas a crédito
@@ -1276,3 +1277,37 @@ def api_calcular_cuotas():
         'total_financiado': float(total_financiado),
         'total_interes': float(total_interes)
     })
+
+
+# -----------------------------------------------------------------------------
+# --- RUTAS PARA DEVOLUCIONES ---
+# -----------------------------------------------------------------------------
+@bp.route('/ventas/<int:venta_id>/devolucion', methods=['GET', 'POST'])
+@admin_required
+def procesar_devolucion(venta_id):
+    venta = Venta.query.get_or_404(venta_id)
+    if venta.estado not in ['Pagada', 'Credito', 'Con Devolucion']:
+        flash('Solo se pueden procesar devoluciones de ventas finalizadas.', 'danger')
+        return redirect(url_for('admin.ver_venta', id=venta.id))
+
+    form = DevolucionForm()
+
+    #LÓGICA GET: Poblar el formulario con los productos de la venta
+    if request.method == 'GET':
+        while len(form.productos) > 0:
+            form.productos.pop_entry()
+
+        for item in venta.productos_asociados:
+            producto_form = DevolucionProductoForm()
+            producto_form.producto_id = item.producto_id
+            producto_form.cantidad_a_devolver = item.cantidad
+            form.productos.append_entry(producto_form)
+
+    if form.validate_on_submit():
+
+        pass
+
+    return render_template('admin/devolucion.html',
+                           titulo='Procesar Devolución',
+                           venta=venta,
+                           form=form)

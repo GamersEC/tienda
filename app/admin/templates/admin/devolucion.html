@@ -1,0 +1,206 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <h1 class="h2">{{ titulo }}</h1>
+        <p class="text-muted">Venta Original #{{ venta.id }} - Cliente: {{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</p>
+    </div>
+</div>
+
+<form method="POST" novalidate enctype="multipart/form-data" id="devolucion-form">
+    {{ form.hidden_tag() }}
+    <div class="card shadow-sm">
+        <div class="card-header"><h5 class="mb-0">1. Seleccionar Productos a Devolver</h5></div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th class="text-center">Cant. Vendida</th>
+                        <th style="width: 20%;">Cantidad a Devolver</th>
+                        <th class="text-center">Devolver al Stock</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for producto_form in form.productos %}
+                    {% set venta_item = venta.productos_asociados | selectattr('producto_id', 'equalto', producto_form.producto_id.data | int) | first %}
+                    <tr>
+                        <td>
+                            <strong>{{ venta_item.producto.nombre }}</strong><br>
+                            <small class="text-muted">${{ "%.2f"|format(venta_item.precio_unitario) }} c/u</small>
+                        </td>
+                        <td class="text-center">{{ venta_item.cantidad }}</td>
+                        <td>
+                            {{ producto_form.producto_id() }}
+                            {{ producto_form.cantidad_a_devolver(class="form-control form-control-sm", type="number", min="0", max=venta_item.cantidad) }}
+                        </td>
+                        <td class="text-center">
+                            <div class="form-check form-switch d-flex justify-content-center">
+                                {{ producto_form.devuelto_al_stock(class="form-check-input") }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header"><h5 class="mb-0">2. Motivo y Opciones de Reembolso</h5></div>
+        <div class="card-body">
+            <!-- MOTIVO -->
+            <div class="mb-3">
+                {{ form.motivo.label(class="form-label fw-bold") }}
+                {{ form.motivo(class="form-control", rows="2") }}
+            </div>
+            <hr>
+            <div class="mb-3">
+                {{ form.opcion_reembolso.label(class="form-label fw-bold") }}
+                <div>
+                    {% for subfield in form.opcion_reembolso %}
+                    <div class="form-check">
+                        {{ subfield(class="form-check-input") }}
+                        {{ subfield.label(class="form-check-label") }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="reembolso-fields" class="bg-light p-3 rounded" style="display: none;">
+                <h6>Detalles del Reembolso</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.metodo_reembolso.label(class="form-label") }}
+                        {{ form.metodo_reembolso(class="form-select") }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.notas_reembolso.label(class="form-label") }}
+                        {{ form.notas_reembolso(class="form-control", rows="1", placeholder="Ej: Nombre de Banco, N° de cuenta, etc") }}
+                    </div>
+                </div>
+                <div class="mb-3" id="comprobante-field" style="display: none;">
+                    {{ form.comprobante_reembolso.label(class="form-label fw-bold") }}
+                    {{ form.comprobante_reembolso(class="form-control") }}
+                    <div class="form-text">Requerido si el método es Transferencia.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-end">
+        <a href="{{ url_for('admin.ver_venta', id=venta.id) }}" class="btn btn-secondary me-2">Cancelar</a>
+        <button type="button" class="btn btn-primary" id="confirm-devolucion-btn">Procesar Devolución</button>
+    </div>
+</form>
+
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="confirmacionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Devolución</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Por favor, revisa los detalles de la devolución antes de confirmar. <strong>Esta acción es irreversible.</strong></p>
+                <div id="resumen-devolucion">
+                    <!-- El contenido del resumen se generará con JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="submit-devolucion-final-btn" form="devolucion-form">Confirmar y Procesar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const opcionReembolsoRadios = document.querySelectorAll('input[name="opcion_reembolso"]');
+        const reembolsoFields = document.getElementById('reembolso-fields');
+        const metodoReembolsoSelect = document.getElementById('metodo_reembolso');
+        const comprobanteField = document.getElementById('comprobante-field');
+
+        function toggleReembolsoFields() {
+            const selectedValue = document.querySelector('input[name="opcion_reembolso"]:checked')?.value;
+            reembolsoFields.style.display = selectedValue === 'Reembolso' ? 'block' : 'none';
+            toggleComprobanteField();
+        }
+
+        function toggleComprobanteField() {
+            const metodo = metodoReembolsoSelect.value;
+            const show = reembolsoFields.style.display === 'block' && metodo === 'Transferencia';
+            comprobanteField.style.display = show ? 'block' : 'none';
+        }
+
+        opcionReembolsoRadios.forEach(radio => radio.addEventListener('change', toggleReembolsoFields));
+        metodoReembolsoSelect.addEventListener('change', toggleComprobanteField);
+        toggleReembolsoFields();
+
+        const confirmBtn = document.getElementById('confirm-devolucion-btn');
+        const modal = new bootstrap.Modal(document.getElementById('confirmacionModal'));
+        const resumenDiv = document.getElementById('resumen-devolucion');
+        const devolucionForm = document.getElementById('devolucion-form');
+        const motivoTextarea = document.getElementById('motivo');
+
+        confirmBtn.addEventListener('click', function() {
+            let montoTotalDevolucion = 0;
+            let resumenProductosHtml = '<h6>Productos a Devolver:</h6><ul>';
+            let tieneProductos = false;
+
+            document.querySelectorAll('tbody tr').forEach((row, index) => {
+                const cantidadInput = row.querySelector(`input[id="productos-${index}-cantidad_a_devolver"]`);
+                const cantidad = parseInt(cantidadInput.value) || 0;
+
+                if (cantidad > 0) {
+                    tieneProductos = true;
+                    const productoNombre = row.querySelector('td:first-child strong').textContent;
+                    const precioUnitarioText = row.querySelector('td:first-child small').textContent.replace('$', '').replace(' c/u', '');
+                    const precioUnitario = parseFloat(precioUnitarioText);
+                    montoTotalDevolucion += cantidad * precioUnitario;
+                    resumenProductosHtml += `<li>${cantidad} x ${productoNombre}</li>`;
+                }
+            });
+
+            if (!tieneProductos) {
+                alert("Debes especificar una cantidad mayor a cero para al menos un producto.");
+                return;
+            }
+            resumenProductosHtml += '</ul>';
+
+            const motivo = motivoTextarea.value;
+            const resumenMotivoHtml = motivo ? `<h6>Motivo:</h6><p>${motivo}</p>` : '';
+
+            const opcionReembolso = document.querySelector('input[name="opcion_reembolso"]:checked').value;
+            let resumenReembolsoHtml = `<h6>Opción de Reembolso:</h6><p>`;
+            if (opcionReembolso === 'NotaCredito') {
+                resumenReembolsoHtml += `Generar Nota de Crédito por <strong>$${montoTotalDevolucion.toFixed(2)}</strong></p>`;
+            } else {
+                const metodo = metodoReembolsoSelect.value;
+                resumenReembolsoHtml += `Reembolsar <strong>$${montoTotalDevolucion.toFixed(2)}</strong> en ${metodo}</p>`;
+            }
+
+            resumenDiv.innerHTML = `
+            ${resumenProductosHtml}
+            ${resumenMotivoHtml ? `<hr>${resumenMotivoHtml}`: ''}
+            <hr>
+            ${resumenReembolsoHtml}
+            <hr>
+            <h5 class="text-end">Total a Reembolsar/Acreditar: <span class="text-primary">$${montoTotalDevolucion.toFixed(2)}</span></h5>
+        `;
+
+            modal.show();
+        });
+
+    });
+</script>
+{% endblock %}
