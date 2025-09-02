@@ -34,6 +34,8 @@ from app.models.configuracion import Configuracion
 from app.models.gasto import Gasto
 from app.models.categoria_gasto import CategoriaGasto
 from app.models.plan_pago import PlanPago
+from app.models.devolucion import Devolucion
+from app.models.devolucion_producto import DevolucionProducto
 
 #Importación de todos los Formularios
 from app.admin.forms import (
@@ -93,7 +95,6 @@ def _calcular_plan_de_pagos(monto_venta, abono_inicial, numero_cuotas, frecuenci
 @bp.route('/configuracion', methods=['GET', 'POST'])
 @admin_required
 def configuracion_tienda():
-    #Obtenemos la primera fila de configuración, o creamos una si no existe
     config = Configuracion.obtener_config()
     if not config:
         config = Configuracion()
@@ -102,15 +103,12 @@ def configuracion_tienda():
 
     form = ConfiguracionForm(obj=config)
     if form.validate_on_submit():
-        #Guardar todos los campos del formulario en el objeto de configuración
         form.populate_obj(config)
 
         logo_file = form.logo.data
         if logo_file:
-            #Eliminar logo anterior si existe para no acumular archivos
             if config.logo_path and os.path.exists(os.path.join(current_app.static_folder, config.logo_path)):
                 os.remove(os.path.join(current_app.static_folder, config.logo_path))
-
             filename = secure_filename(f"{uuid.uuid4().hex}_{logo_file.filename}")
             upload_dir = os.path.join(current_app.static_folder, 'uploads', 'logos')
             os.makedirs(upload_dir, exist_ok=True)
@@ -161,89 +159,98 @@ def before_request():
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    #Fechas de referencia
+    # Fechas de referencia
     hoy_inicio = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     hace_30_dias = datetime.utcnow() - timedelta(days=30)
 
-    #Ingresos
+    # --- CÁLCULOS FINANCIEROS CLAROS ---
+
+    # 1. INGRESOS BRUTOS (Total de ventas finalizadas en el período)
+    ingresos_brutos_mes = db.session.query(func.sum(Venta.monto_total)).filter(
+        Venta.fecha_venta >= hace_30_dias,
+        Venta.estado.in_(['Pagada', 'Credito', 'Con Devolucion'])
+    ).scalar() or Decimal('0.0')
+
+    # 2. REEMBOLSOS (Total de dinero devuelto a clientes, registrado como gasto)
+    reembolsos_mes = db.session.query(func.sum(Gasto.monto)).join(CategoriaGasto).filter(
+        Gasto.fecha >= hace_30_dias,
+        CategoriaGasto.nombre == 'Devoluciones'
+    ).scalar() or Decimal('0.0')
+
+    # 3. INGRESOS NETOS (Lo que realmente queda después de devoluciones)
+    ingresos_netos_mes = ingresos_brutos_mes - reembolsos_mes
+
+    # 4. GASTOS OPERATIVOS (Todos los gastos EXCEPTO devoluciones)
+    gastos_operativos_mes = db.session.query(func.sum(Gasto.monto)).join(CategoriaGasto).filter(
+        Gasto.fecha >= hace_30_dias,
+        CategoriaGasto.nombre != 'Devoluciones'
+    ).scalar() or Decimal('0.0')
+
+    # 5. BENEFICIO NETO (La ganancia final)
+    beneficio_neto_mes = ingresos_netos_mes - gastos_operativos_mes
+
+    # Métricas del día (para vista rápida)
     ingresos_hoy = db.session.query(func.sum(Venta.monto_total)).filter(
-        Venta.fecha_venta >= hoy_inicio, Venta.estado.in_(['Pagada', 'Pendiente'])
-    ).scalar() or 0
-    ingresos_mes = db.session.query(func.sum(Venta.monto_total)).filter(
-        Venta.fecha_venta >= hace_30_dias, Venta.estado.in_(['Pagada', 'Pendiente'])
-    ).scalar() or 0
+        Venta.fecha_venta >= hoy_inicio,
+        Venta.estado.in_(['Pagada', 'Pendiente', 'Credito', 'Con Devolucion'])
+    ).scalar() or Decimal('0.0')
     ventas_hoy = Venta.query.filter(
-        Venta.fecha_venta >= hoy_inicio, Venta.estado.in_(['Pagada', 'Pendiente'])
+        Venta.fecha_venta >= hoy_inicio,
+        Venta.estado.in_(['Pagada', 'Pendiente', 'Credito', 'Con Devolucion'])
     ).count()
 
-    #Gastos
-    gastos_hoy = db.session.query(func.sum(Gasto.monto)).filter(Gasto.fecha >= hoy_inicio).scalar() or 0
-    gastos_mes = db.session.query(func.sum(Gasto.monto)).filter(Gasto.fecha >= hace_30_dias).scalar() or 0
-
-    #Beneficio Neto
-    beneficio_neto_mes = ingresos_mes - gastos_mes
-
-    #Grafico de ventas diarias (ultimos 30 días)
+    # Gráfico de ventas (basado en Ingresos Brutos)
     ventas_por_dia = db.session.query(
         cast(Venta.fecha_venta, Date).label('dia'),
         func.sum(Venta.monto_total).label('total_vendido')
     ).filter(
         Venta.fecha_venta >= hace_30_dias,
-        Venta.estado.in_(['Pagada', 'Pendiente'])
+        Venta.estado.in_(['Pagada', 'Pendiente', 'Credito', 'Con Devolucion'])
     ).group_by('dia').order_by('dia').all()
     chart_labels = [venta.dia.strftime('%d %b') for venta in ventas_por_dia]
     chart_data = [float(venta.total_vendido) for venta in ventas_por_dia]
 
-    #Top 5 Productos más Vendidos (por cantidad)
+    # Consultas "Top 5"
     top_productos = db.session.query(
         Producto,
         func.sum(VentaProducto.cantidad).label('total_cantidad')
-    ).join(VentaProducto, Producto.id == VentaProducto.producto_id) \
-        .join(Venta, Venta.id == VentaProducto.venta_id) \
-        .filter(
+    ).join(VentaProducto).join(Venta).filter(
         Venta.fecha_venta >= hace_30_dias,
-        Venta.estado.in_(['Pagada', 'Pendiente'])
+        Venta.estado.in_(['Pagada', 'Pendiente','Credito', 'Con Devolucion'])
     ).group_by(Producto.id).order_by(func.sum(VentaProducto.cantidad).desc()).limit(5).all()
 
-    #Top 5 Clientes (por total gastado)
     top_clientes = db.session.query(
         Cliente,
         func.sum(Venta.monto_total).label('total_gastado')
-    ).join(Cliente, Venta.cliente_id == Cliente.id) \
-        .filter(
+    ).join(Venta).filter(
         Venta.fecha_venta >= hace_30_dias,
-        Venta.estado.in_(['Pagada', 'Pendiente'])
+        Venta.estado.in_(['Pagada', 'Pendiente','Credito', 'Con Devolucion'])
     ).group_by(Cliente.id).order_by(func.sum(Venta.monto_total).desc()).limit(5).all()
 
-    #Top 5 Categorías de Gastos
     top_categorias_gasto = db.session.query(
         CategoriaGasto.nombre,
         func.sum(Gasto.monto).label('total_gastado')
-    ).join(CategoriaGasto, Gasto.categoria_id == CategoriaGasto.id) \
-        .filter(Gasto.fecha >= hace_30_dias) \
-        .group_by(CategoriaGasto.nombre) \
-        .order_by(func.sum(Gasto.monto).desc()) \
-        .limit(5).all()
+    ).join(Gasto).filter(
+        Gasto.fecha >= hace_30_dias
+    ).group_by(CategoriaGasto.nombre).order_by(func.sum(Gasto.monto).desc()).limit(5).all()
 
-    #Productos con bajo stock
     productos_bajo_stock = Producto.query.filter(Producto.stock <= 5).order_by(Producto.stock.asc()).limit(5).all()
 
     return render_template('admin/dashboard.html',
                            titulo='Dashboard Analítico',
-                           # Métricas clave
+                           ingresos_brutos_mes=ingresos_brutos_mes,
+                           reembolsos_mes=reembolsos_mes,
+                           ingresos_netos_mes=ingresos_netos_mes,
+                           gastos_operativos_mes=gastos_operativos_mes,
+                           beneficio_neto_mes=beneficio_neto_mes,
                            ingresos_hoy=ingresos_hoy,
                            ventas_hoy=ventas_hoy,
-                           gastos_hoy=gastos_hoy,
-                           beneficio_neto_mes=beneficio_neto_mes,
-                           # Datos para el gráfico
                            chart_labels=chart_labels,
                            chart_data=chart_data,
-                           # Listas "Top 5"
                            top_productos=top_productos,
                            top_clientes=top_clientes,
                            top_categorias_gasto=top_categorias_gasto,
-                           productos_bajo_stock=productos_bajo_stock
-                           )
+                           productos_bajo_stock=productos_bajo_stock)
 
 @bp.route('/')
 @login_required
@@ -631,9 +638,12 @@ def crear_venta():
 
     return render_template('admin/crear_venta.html', form=form, titulo='Iniciar Nueva Venta')
 
+
 @bp.route('/ventas/editar/<int:id>', methods=['GET', 'POST'])
 def editar_venta(id):
     venta = Venta.query.get_or_404(id)
+    config = Configuracion.obtener_config()
+
     if venta.estado != 'En Proceso':
         flash('Esta venta ya está finalizada y no se puede modificar.', 'warning')
         return redirect(url_for('admin.ver_venta', id=id))
@@ -642,27 +652,29 @@ def editar_venta(id):
     agregar_producto_form = AgregarProductoVentaForm()
     credito_form = CreditoForm(obj=venta)
 
-    #Cargar productos con atributos
     productos_disponibles = Producto.query.filter(Producto.stock > 0).order_by(Producto.nombre).all()
     opciones_productos = []
     for p in productos_disponibles:
-        atributos_str = ", ".join(
-            f"{val.atributo.nombre_atributo}: {val.valor}" for val in p.valores_atributos
-        )
+        atributos_str = ", ".join(f"{val.atributo.nombre_atributo}: {val.valor}" for val in p.valores_atributos)
         texto_opcion = f"{p.nombre} ({atributos_str})" if atributos_str else p.nombre
         opciones_productos.append((p.id, texto_opcion))
-
-    #Asignamos las nuevas opciones al campo 'producto' del formulario
     agregar_producto_form.producto.choices = opciones_productos
 
     stock_data = {str(p.id): p.stock for p in productos_disponibles}
 
+    config_data_for_js = {
+        'montoMinimoCredito': float(config.monto_minimo_credito or 0),
+        'cuotasMaximas': {
+            'Diaria': config.cuotas_maximas_diario,
+            'Semanal': config.cuotas_maximas_semanal,
+            'Mensual': config.cuotas_maximas_mensual
+        }
+    }
+
     if 'submit_producto' in request.form and agregar_producto_form.validate():
-        #Lógica para añadir producto
         producto_id = agregar_producto_form.producto.data
         producto = Producto.query.get(producto_id)
         cantidad_a_vender = agregar_producto_form.cantidad.data
-
         if cantidad_a_vender > producto.stock:
             flash(f'No se puede añadir. Solo quedan {producto.stock} unidades de "{producto.nombre}".', 'danger')
         else:
@@ -682,38 +694,25 @@ def editar_venta(id):
             flash('No se puede finalizar una venta sin productos.', 'danger')
             return redirect(url_for('admin.editar_venta', id=id))
 
+        if credito_form.tipo_pago.data == 'Credito':
+            if config and venta.monto_total < config.monto_minimo_credito:
+                flash(f'El monto de la venta (${venta.monto_total}) es menor al mínimo requerido (${config.monto_minimo_credito}) para ofrecer crédito.', 'danger')
+                return redirect(url_for('admin.editar_venta', id=id))
+
         venta.tipo_pago = credito_form.tipo_pago.data
         if venta.tipo_pago == 'Credito':
             if not credito_form.numero_cuotas.data or not credito_form.frecuencia_cuotas.data:
                 flash('El número y la frecuencia de cuotas son requeridos para ventas a crédito.', 'danger')
                 return redirect(url_for('admin.editar_venta', id=id))
-
             venta.numero_cuotas = credito_form.numero_cuotas.data
             venta.frecuencia_cuotas = credito_form.frecuencia_cuotas.data
             venta.abono_inicial = credito_form.abono_inicial.data or 0
-
-            config = Configuracion.obtener_config()
-            plan_calculado = _calcular_plan_de_pagos(
-                venta.monto_total, venta.abono_inicial, venta.numero_cuotas, venta.frecuencia_cuotas, config
-            )
-
+            plan_calculado = _calcular_plan_de_pagos(venta.monto_total, venta.abono_inicial, venta.numero_cuotas, venta.frecuencia_cuotas, config)
             for cuota_data in plan_calculado:
-                nueva_cuota = PlanPago(
-                    venta_id=venta.id,
-                    numero_cuota=cuota_data['numero_cuota'],
-                    monto_capital=cuota_data['monto_capital'],
-                    monto_interes=cuota_data['monto_interes'],
-                    monto_total_cuota=cuota_data['monto_total_cuota'],
-                    fecha_vencimiento=cuota_data['fecha_vencimiento']
-                )
+                nueva_cuota = PlanPago(venta_id=venta.id, numero_cuota=cuota_data['numero_cuota'], monto_capital=cuota_data['monto_capital'], monto_interes=cuota_data['monto_interes'], monto_total_cuota=cuota_data['monto_total_cuota'], fecha_vencimiento=cuota_data['fecha_vencimiento'])
                 db.session.add(nueva_cuota)
-
             if venta.abono_inicial > 0:
-                abono = Pago(
-                    monto_pago=venta.abono_inicial,
-                    metodo_pago=credito_form.metodo_pago_abono.data,
-                    venta_id=venta.id
-                )
+                abono = Pago(monto_pago=venta.abono_inicial, metodo_pago=credito_form.metodo_pago_abono.data, venta_id=venta.id)
                 comprobante_file = credito_form.comprobante_abono.data
                 if comprobante_file:
                     filename = secure_filename(f"{uuid.uuid4().hex}_{comprobante_file.filename}")
@@ -723,13 +722,11 @@ def editar_venta(id):
                     comprobante_file.save(filepath)
                     abono.comprobante_path = os.path.join('uploads', 'comprobantes', filename)
                 db.session.add(abono)
-
             venta.estado = 'Credito'
             flash('Venta a crédito finalizada. Plan de pagos generado.', 'success')
         else:
             venta.estado = 'Pendiente'
             flash('Venta de contado finalizada. Pendiente de pago.', 'success')
-
         db.session.commit()
         return redirect(url_for('admin.ver_venta', id=id))
 
@@ -742,7 +739,9 @@ def editar_venta(id):
                            agregar_producto_form=agregar_producto_form,
                            credito_form=credito_form,
                            anular_venta_form=anular_venta_form,
-                           stock_data=stock_data)
+                           stock_data=stock_data,
+                           config=config,
+                           config_data=config_data_for_js)
 
 @bp.route('/ventas/editar/<int:venta_id>/eliminar_producto/<int:producto_asociado_id>', methods=['POST'])
 @admin_required
@@ -764,15 +763,77 @@ def finalizar_venta(id):
 @bp.route('/ventas/<int:id>')
 def ver_venta(id):
     venta = Venta.query.get_or_404(id)
+    config = Configuracion.obtener_config()
     pago_form = PagoForm()
     pago_cuota_form = PagoCuotaForm()
     total_pagado = db.session.query(func.sum(Pago.monto_pago)).filter_by(venta_id=id).scalar() or 0
+    pagos_ordenados = venta.pagos.order_by(Pago.fecha_pago.asc()).all()
+
+    productos_activos_en_venta = []
+    for item_venta in venta.productos_asociados:
+        cantidad_devuelta = db.session.query(func.sum(DevolucionProducto.cantidad_devuelta)).join(Devolucion).filter(
+            Devolucion.venta_id == venta.id,
+            DevolucionProducto.producto_id == item_venta.producto_id
+        ).scalar() or 0
+
+        cantidad_activa = item_venta.cantidad - cantidad_devuelta
+        if cantidad_activa > 0:
+            #Creamos un objeto temporal para pasarlo a la plantilla con la cantidad correcta
+            item_activo = {
+                'producto': item_venta.producto,
+                'cantidad': cantidad_activa,
+                'precio_unitario': item_venta.precio_unitario,
+                'subtotal': cantidad_activa * item_venta.precio_unitario
+            }
+            productos_activos_en_venta.append(item_activo)
+
+    devolucion_permitida = False
+    mensaje_devolucion = ""
+    if config:
+        dias_desde_venta = (datetime.utcnow() - venta.fecha_venta).days
+        if dias_desde_venta <= config.dias_max_devolucion:
+            devolucion_permitida = True
+        else:
+            mensaje_devolucion = f"El período de {config.dias_max_devolucion} días para devoluciones ha expirado."
+
+    resumen_credito = None
+    if venta.tipo_pago == 'Credito':
+        monto_capital_total = venta.monto_total - (venta.abono_inicial or 0)
+        monto_intereses_total = sum(c.monto_interes for c in venta.plan_pagos)
+        monto_total_credito = monto_capital_total + monto_intereses_total
+
+        pagado_a_capital = 0
+        pagado_a_interes = 0
+        cuotas_pagadas = venta.plan_pagos.filter_by(estado='Pagada').all()
+        for cuota in cuotas_pagadas:
+            pagado_a_capital += cuota.monto_capital
+            pagado_a_interes += cuota.monto_interes
+
+        saldo_pendiente_credito = monto_total_credito - (pagado_a_capital + pagado_a_interes)
+
+        resumen_credito = {
+            'monto_capital_total': monto_capital_total,
+            'monto_intereses_total': monto_intereses_total,
+            'monto_total_credito': monto_total_credito,
+            'pagado_a_capital': pagado_a_capital,
+            'pagado_a_interes': pagado_a_interes,
+            'saldo_pendiente_credito': saldo_pendiente_credito,
+            'abono_inicial': (venta.abono_inicial or 0)
+        }
+
+    historial_devoluciones = venta.devoluciones.order_by(Devolucion.fecha_devolucion.asc()).all()
 
     return render_template('admin/ver_venta.html',
                            venta=venta,
                            pago_form=pago_form,
                            total_pagado=total_pagado,
-                           pago_cuota_form=pago_cuota_form)
+                           pago_cuota_form=pago_cuota_form,
+                           resumen_credito=resumen_credito,
+                           devolucion_permitida=devolucion_permitida,
+                           mensaje_devolucion=mensaje_devolucion,
+                           historial_devoluciones=historial_devoluciones,
+                           pagos_ordenados=pagos_ordenados,
+                           productos_activos=productos_activos_en_venta)
 
 @bp.route('/ventas/<int:id>/pagar', methods=['POST'])
 def agregar_pago(id):
@@ -852,13 +913,14 @@ def pagar_cuota(cuota_id):
 
     if form.validate_on_submit():
         monto_pagado = form.monto_pago.data
+        monto_original_cuota = cuota.monto_total_cuota
 
-        #Validación para no pagar de más en una cuota
-        if monto_pagado > cuota.monto_total_cuota and not isclose(monto_pagado, cuota.monto_total_cuota):
-            flash(f'El monto a pagar (${monto_pagado}) no puede ser mayor al valor de la cuota (${cuota.monto_total_cuota}).', 'danger')
+        # Validar que el pago no sea mayor ni menor al valor de la cuota
+        if not isclose(monto_pagado, monto_original_cuota):
+            flash(f'El monto a pagar (${monto_pagado}) debe ser exactamente igual al valor de la cuota (${monto_original_cuota}).', 'danger')
             return redirect(url_for('admin.ver_venta', id=venta.id))
 
-        #Crear el nuevo registro de pago
+        # Crear el nuevo registro de pago
         nuevo_pago = Pago(
             monto_pago=monto_pagado,
             metodo_pago=form.metodo_pago.data,
@@ -877,18 +939,12 @@ def pagar_cuota(cuota_id):
         db.session.add(nuevo_pago)
         db.session.flush()
 
-        #Actualizar el estado de la cuota y enlazarla al pago
+        # Actualizar el estado de la cuota y enlazarla al pago
         cuota.estado = 'Pagada'
         cuota.pago_id = nuevo_pago.id
 
-        #Verificar si todas las cuotas ya están pagadas para actualizar la venta
-        todas_pagadas = True
-        for c in venta.plan_pagos:
-            if c.estado != 'Pagada':
-                todas_pagadas = False
-                break
-
-        if todas_pagadas:
+        # Verificar si todas las cuotas ya están pagadas para actualizar la venta
+        if all(c.estado == 'Pagada' for c in venta.plan_pagos):
             venta.estado = 'Pagada'
 
         db.session.commit()
@@ -1286,28 +1342,136 @@ def api_calcular_cuotas():
 @admin_required
 def procesar_devolucion(venta_id):
     venta = Venta.query.get_or_404(venta_id)
+    config = Configuracion.obtener_config()
+
+    dias_desde_venta = (datetime.utcnow() - venta.fecha_venta).days
+    if config and dias_desde_venta > config.dias_max_devolucion:
+        flash(f"No se puede procesar la operación. El período de {config.dias_max_devolucion} días ha expirado.", 'danger')
+        return redirect(url_for('admin.ver_venta', id=venta.id))
+
     if venta.estado not in ['Pagada', 'Credito', 'Con Devolucion']:
-        flash('Solo se pueden procesar devoluciones de ventas finalizadas.', 'danger')
+        flash('Solo se pueden procesar devoluciones o cambios de ventas ya finalizadas.', 'danger')
         return redirect(url_for('admin.ver_venta', id=venta.id))
 
     form = DevolucionForm()
+    agregar_producto_form = AgregarProductoVentaForm()
+    productos_disponibles = Producto.query.filter(Producto.stock > 0).order_by(Producto.nombre).all()
+    opciones_productos = []
+    for p in productos_disponibles:
+        atributos_str = ", ".join(f"{val.atributo.nombre_atributo}: {val.valor}" for val in p.valores_atributos)
+        texto_opcion = f"{p.nombre} ({atributos_str})" if atributos_str else p.nombre
+        opciones_productos.append((p.id, texto_opcion))
+    agregar_producto_form.producto.choices = opciones_productos
 
-    #LÓGICA GET: Poblar el formulario con los productos de la venta
+    #Crear un diccionario de datos para JavaScript
+    product_data_for_js = {
+        str(p.id): {
+            'texto': opciones_productos[i][1],
+            'precio': float(p.precio)
+        } for i, p in enumerate(productos_disponibles)
+    }
+
+    if form.validate_on_submit():
+        monto_total_devolucion = Decimal('0.0')
+        productos_devueltos_data = []
+        for i, producto_form in enumerate(form.productos):
+            cantidad_a_devolver = producto_form.cantidad_a_devolver.data or 0
+            if cantidad_a_devolver > 0:
+                item_original = venta.productos_asociados[i]
+                devoluciones_previas = db.session.query(func.sum(DevolucionProducto.cantidad_devuelta)).join(Devolucion).filter(
+                    Devolucion.venta_id == venta.id,
+                    DevolucionProducto.producto_id == item_original.producto_id
+                ).scalar() or 0
+                if cantidad_a_devolver > (item_original.cantidad - devoluciones_previas):
+                    flash(f"Error: La cantidad a devolver para '{item_original.producto.nombre}' excede la cantidad restante.", 'danger')
+                    return redirect(url_for('admin.procesar_devolucion', venta_id=venta.id))
+                monto_total_devolucion += cantidad_a_devolver * item_original.precio_unitario
+                productos_devueltos_data.append({'form_data': producto_form, 'item_original': item_original})
+
+        monto_nuevo_cargo = Decimal('0.0')
+        nuevos_productos_data = []
+        nuevos_productos_ids = request.form.getlist('nuevo_producto_id')
+        nuevas_cantidades = request.form.getlist('nueva_cantidad')
+        for prod_id, cantidad_str in zip(nuevos_productos_ids, nuevas_cantidades):
+            cantidad = int(cantidad_str)
+            if cantidad > 0:
+                producto = Producto.query.get(prod_id)
+                monto_nuevo_cargo += producto.precio * cantidad
+                nuevos_productos_data.append({'producto': producto, 'cantidad': cantidad})
+
+        if not productos_devueltos_data and not nuevos_productos_data:
+            flash('Debes devolver o añadir al menos un producto para procesar la operación.', 'warning')
+            return redirect(url_for('admin.procesar_devolucion', venta_id=venta.id))
+
+        balance = monto_nuevo_cargo - monto_total_devolucion
+
+        if productos_devueltos_data:
+            nueva_devolucion = Devolucion(venta_id=venta.id, motivo=form.motivo.data, monto_total_devolucion=monto_total_devolucion)
+            db.session.add(nueva_devolucion)
+            db.session.flush()
+            for data in productos_devueltos_data:
+                dev_prod = DevolucionProducto(devolucion_id=nueva_devolucion.id, producto_id=data['item_original'].producto_id, cantidad_devuelta=data['form_data'].cantidad_a_devolver.data, devuelto_al_stock=data['form_data'].devuelto_al_stock.data)
+                if dev_prod.devuelto_al_stock:
+                    producto = Producto.query.get(dev_prod.producto_id)
+                    producto.stock += dev_prod.cantidad_devuelta
+                db.session.add(dev_prod)
+
+        if nuevos_productos_data:
+            for data in nuevos_productos_data:
+                asociacion = VentaProducto(venta_id=venta.id, producto_id=data['producto'].id, cantidad=data['cantidad'], precio_unitario=data['producto'].precio)
+                db.session.add(asociacion)
+                data['producto'].stock -= data['cantidad']
+
+        if balance > 0:
+            nuevo_pago = Pago(monto_pago=balance, metodo_pago=form.metodo_reembolso.data, venta_id=venta.id, fecha_pago=datetime.utcnow())
+            db.session.add(nuevo_pago)
+            flash(f'El cliente debe pagar una diferencia de ${balance:.2f}. Pago registrado.', 'success')
+        elif balance < 0:
+            monto_a_reembolsar = abs(balance)
+            categoria_devoluciones = CategoriaGasto.query.filter_by(nombre='Devoluciones').first()
+            if not categoria_devoluciones:
+                categoria_devoluciones = CategoriaGasto(nombre='Devoluciones')
+                db.session.add(categoria_devoluciones)
+                db.session.flush()
+            reembolso = Gasto(descripcion=f'Reembolso por devolución/cambio Venta #{venta.id}', monto=monto_a_reembolsar, categoria_id=categoria_devoluciones.id, usuario_id=current_user.id, fecha=datetime.utcnow())
+            db.session.add(reembolso)
+            flash(f'Se ha reembolsado al cliente ${monto_a_reembolsar:.2f}. Gasto registrado.', 'info')
+
+        venta.monto_total += balance
+        venta.estado = 'Con Devolucion'
+
+        # En el futuro, aquí podría ir la lógica para recalcular el plan de pagos si es a crédito
+
+        db.session.commit()
+
+        flash('La operación de cambio/devolución se ha procesado exitosamente.', 'success')
+        return redirect(url_for('admin.ver_venta', id=venta.id))
+
     if request.method == 'GET':
         while len(form.productos) > 0:
             form.productos.pop_entry()
-
         for item in venta.productos_asociados:
+            devoluciones_previas = db.session.query(func.sum(DevolucionProducto.cantidad_devuelta)).join(Devolucion).filter(Devolucion.venta_id == venta.id, DevolucionProducto.producto_id == item.producto_id).scalar() or 0
             producto_form = DevolucionProductoForm()
             producto_form.producto_id = item.producto_id
-            producto_form.cantidad_a_devolver = item.cantidad
+            producto_form.cantidad_a_devolver = item.cantidad - devoluciones_previas
             form.productos.append_entry(producto_form)
 
-    if form.validate_on_submit():
-
-        pass
-
     return render_template('admin/devolucion.html',
-                           titulo='Procesar Devolución',
+                           titulo='Procesar Devolución o Cambio',
                            venta=venta,
-                           form=form)
+                           form=form,
+                           agregar_producto_form=agregar_producto_form,
+                           product_data=product_data_for_js)
+
+@bp.route('/devoluciones')
+@login_required
+def listar_devoluciones():
+    devoluciones = Devolucion.query.order_by(Devolucion.fecha_devolucion.desc()).all()
+    return render_template('admin/devoluciones.html', devoluciones=devoluciones, titulo='Historial de Devoluciones')
+
+@bp.route('/devoluciones/<int:id>')
+@login_required
+def ver_devolucion(id):
+    devolucion = Devolucion.query.get_or_404(id)
+    return render_template('admin/ver_devolucion.html', devolucion=devolucion, titulo=f'Detalle de Devolución #{devolucion.id}')

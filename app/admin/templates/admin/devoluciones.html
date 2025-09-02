@@ -1,0 +1,46 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">{{ titulo }}</h1>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th scope="col">ID Dev.</th>
+                        <th scope="col">Venta Original</th>
+                        <th scope="col">Cliente</th>
+                        <th scope="col">Fecha</th>
+                        <th scope="col" class="text-end">Monto Devuelto</th>
+                        <th scope="col" class="text-end">Acciones</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for dev in devoluciones %}
+                        <tr>
+                            <th scope="row">#{{ dev.id }}</th>
+                            <td><a href="{{ url_for('admin.ver_venta', id=dev.venta_id) }}">#{{ dev.venta_id }}</a></td>
+                            <td>{{ dev.venta.cliente.nombre }} {{ dev.venta.cliente.apellido or '' }}</td>
+                            <td>{{ dev.fecha_devolucion.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-end fw-bold">${{ "%.2f"|format(dev.monto_total_devolucion) }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('admin.ver_devolucion', id=dev.id) }}" class="btn btn-sm btn-outline-info">Ver Detalle</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted p-4">No se han registrado devoluciones.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

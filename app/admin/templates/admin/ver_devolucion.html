@@ -1,0 +1,81 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">{{ titulo }}</h1>
+        <a href="{{ url_for('admin.ver_venta', id=devolucion.venta_id) }}" class="btn btn-outline-primary">Ver Venta Original</a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h5 class="mb-0">Productos Devueltos</h5></div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-center">Cantidad</th>
+                            <th class="text-center">Devuelto al Stock</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in devolucion.productos_devueltos %}
+                            <tr>
+                                <td>{{ item.producto.nombre }}</td>
+                                <td class="text-center">{{ item.cantidad_devuelta }}</td>
+                                <td class="text-center">
+                                    {% if item.devuelto_al_stock %}
+                                        <span class="badge bg-success">Sí</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">No</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% if devolucion.motivo %}
+                <div class="card shadow-sm">
+                    <div class="card-header"><h5 class="mb-0">Motivo de la Devolución</h5></div>
+                    <div class="card-body">
+                        <p class="mb-0">{{ devolucion.motivo }}</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header"><h5 class="mb-0">Resumen de la Devolución</h5></div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Fecha:</span>
+                            <strong>{{ devolucion.fecha_devolucion.strftime('%Y-%m-%d') }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Cliente:</span>
+                            <strong>{{ devolucion.venta.cliente.nombre }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Monto Devuelto:</span>
+                            <strong class="fs-5">${{ "%.2f"|format(devolucion.monto_total_devolucion) }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Acción:</span>
+                            {% if devolucion.nota_credito %}
+                                <span class="badge bg-primary">Nota de Crédito Generada</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Reembolso en Dinero</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

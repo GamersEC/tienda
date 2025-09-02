@@ -10,7 +10,6 @@ class Devolucion(db.Model):
 
     #Relaciones
     productos_devueltos = db.relationship('DevolucionProducto', back_populates='devolucion', lazy='dynamic', cascade="all, delete-orphan")
-    nota_credito = db.relationship('NotaCredito', back_populates='devolucion', uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Devolucion {self.id} de Venta {self.venta_id}>'

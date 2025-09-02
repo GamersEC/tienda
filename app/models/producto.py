@@ -17,14 +17,11 @@ class Producto(db.Model):
     def __repr__(self):
         return f'<Producto {self.nombre}>'
 
-
     def obtener_valor_atributo(self, nombre_atributo):
         from app.models.atributo import Atributo
         from app.models.valor_atributo_producto import ValorAtributoProducto
-
         attr = Atributo.query.filter_by(nombre_atributo=nombre_atributo, tipo_producto_id=self.tipo_producto_id).first()
         if not attr:
             return None
-
         valor_obj = ValorAtributoProducto.query.filter_by(producto_id=self.id, atributo_id=attr.id).first()
         return valor_obj.valor if valor_obj else None

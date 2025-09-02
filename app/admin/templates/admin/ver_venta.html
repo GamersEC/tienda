@@ -3,268 +3,170 @@
 {% block title %}Detalle de Venta #{{ venta.id }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mt-4 mb-4">
-        <div>
-            <h2 class="mb-0">Detalle de Venta</h2>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_ventas') }}">Ventas</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">#{{ venta.id }}</li>
-                </ol>
-            </nav>
-        </div>
-        <span class="badge fs-6 {% if venta.estado == 'Pagada' %}bg-success{% elif venta.estado == 'Pendiente'%}bg-warning text-dark{% elif venta.estado == 'Anulada' %}bg-danger{% elif venta.estado == 'Credito' %}bg-primary{% else %}bg-secondary{% endif %}">
-            <i class="fas fa-{% if venta.estado == 'Pagada' %}check-circle{% elif venta.estado == 'Pendiente'%}clock{% elif venta.estado == 'Anulada' %}times-circle{% elif venta.estado == 'Credito' %}calendar-alt{% else %}question-circle{% endif %} me-1"></i>
+    <div class="container-fluid px-4">
+        <div class="d-flex justify-content-between align-items-center mt-4 mb-4">
+            <div>
+                <h2 class="mb-0">Detalle de Venta</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_ventas') }}">Ventas</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">#{{ venta.id }}</li>
+                    </ol>
+                </nav>
+            </div>
+            <span class="badge fs-6 {% if venta.estado == 'Pagada' %}bg-success{% elif venta.estado == 'Pendiente'%}bg-warning text-dark{% elif venta.estado == 'Anulada' %}bg-danger{% elif venta.estado == 'Credito' %}bg-primary{% elif venta.estado == 'Con Devolucion' %}bg-secondary{% else %}bg-dark{% endif %}">
+            <i class="fas fa-{% if venta.estado == 'Pagada' %}check-circle{% elif venta.estado == 'Pendiente'%}clock{% elif venta.estado == 'Anulada' %}times-circle{% elif venta.estado == 'Credito' %}calendar-alt{% elif venta.estado == 'Con Devolucion' %}undo{% else %}question-circle{% endif %} me-1"></i>
             {{ venta.estado }}
         </span>
-    </div>
+        </div>
 
-    <!-- Header Info -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-light rounded-circle p-3 me-3"><i class="fas fa-user text-primary fa-lg"></i></div>
-                        <div><h6 class="mb-0">Cliente</h6><p class="mb-0 fw-bold">{{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</p></div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-light rounded-circle p-3 me-3"><i class="fas fa-calendar-alt text-primary fa-lg"></i></div>
-                        <div><h6 class="mb-0">Fecha de Venta</h6><p class="mb-0 fw-bold">{{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</p></div>
-                    </div>
+        <!-- Header Info -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6"><div class="d-flex align-items-center mb-3"><div class="bg-light rounded-circle p-3 me-3"><i class="fas fa-user text-primary fa-lg"></i></div><div><h6 class="mb-0">Cliente</h6><p class="mb-0 fw-bold">{{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</p></div></div></div>
+                    <div class="col-md-6"><div class="d-flex align-items-center mb-3"><div class="bg-light rounded-circle p-3 me-3"><i class="fas fa-calendar-alt text-primary fa-lg"></i></div><div><h6 class="mb-0">Fecha de Venta</h6><p class="mb-0 fw-bold">{{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</p></div></div></div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row g-4">
-        <!-- Columna Izquierda: Resumen Financiero, Productos y Plan de Pagos -->
-        <div class="col-lg-7">
-            <!-- Resumen Financiero -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i> Resumen Financiero</h5></div>
-                <div class="card-body">
-                    <div class="row mb-4">
-                        <div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Monto Total</h6><h4 class="text-dark">${{ "%.2f"|format(venta.monto_total) }}</h4></div></div>
-                        <div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Total Pagado</h6><h4 class="text-success">${{ "%.2f"|format(total_pagado) }}</h4></div></div>
-                        <div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Saldo Pendiente</h6><h4 class="text-danger">${{ "%.2f"|format(venta.monto_total - total_pagado) }}</h4></div></div>
+        <div class="row g-4">
+            <div class="col-lg-7">
+
+                {% if venta.tipo_pago == 'Credito' and resumen_credito %}
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i> Resumen Financiero del Crédito</h5></div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless" style="font-size: 0.9rem;">
+                                <tbody>
+                                <tr><td>Monto de Productos:</td><td class="text-end">${{ "%.2f"|format(venta.monto_total) }}</td><td style="width: 10%;"></td><td>Pagado a Capital:</td><td class="text-end text-success">${{ "%.2f"|format(resumen_credito.pagado_a_capital) }}</td></tr>
+                                <tr><td>Abono Inicial:</td><td class="text-end">- ${{ "%.2f"|format(resumen_credito.abono_inicial) }}</td><td></td><td>Pagado a Intereses:</td><td class="text-end text-success">${{ "%.2f"|format(resumen_credito.pagado_a_interes) }}</td></tr>
+                                <tr class="border-top"><td class="fw-bold">Capital a Financiar:</td><td class="text-end fw-bold">${{ "%.2f"|format(resumen_credito.monto_capital_total) }}</td><td></td><td class="fw-bold">Total Pagado:</td><td class="text-end fw-bold text-success">${{ "%.2f"|format(total_pagado) }}</td></tr>
+                                <tr><td>Intereses Generados:</td><td class="text-end">+ ${{ "%.2f"|format(resumen_credito.monto_intereses_total) }}</td><td colspan="3"></td></tr>
+                                <tr class="border-top bg-light"><td class="fw-bold fs-6">Total del Crédito:</td><td class="text-end fw-bold fs-6">${{ "%.2f"|format(resumen_credito.monto_total_credito) }}</td><td></td><td class="fw-bold fs-6 text-danger">Saldo Pendiente:</td><td class="text-end fw-bold fs-6 text-danger">${{ "%.2f"|format(resumen_credito.saldo_pendiente_credito) }}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    {% if venta.monto_total > 0 %}<div class="mb-3"><div class="d-flex justify-content-between mb-1"><span>Progreso de pago</span>{% set porcentaje_pagado = (total_pagado / venta.monto_total) * 100 %}<span>{{ "%.0f"|format(porcentaje_pagado) }}%</span></div><div class="progress" style="height: 10px;"><div class="progress-bar bg-success" role="progressbar" style="width: {{ porcentaje_pagado }}%;" aria-valuenow="{{ porcentaje_pagado }}" aria-valuemin="0" aria-valuemax="100"></div></div></div>{% endif %}
-                </div>
-            </div>
-
-            <!-- Productos Vendidos -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-box me-2 text-primary"></i> Productos Vendidos</h5></div>
-                <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Producto</th><th class="text-center">Cantidad</th><th class="text-end">Precio Unitario</th><th class="text-end">Subtotal</th></tr></thead><tbody>{% for item in venta.productos_asociados %}<tr><td>{{ item.producto.nombre }}</td><td class="text-center">{{ item.cantidad }}</td><td class="text-end">${{ "%.2f"|format(item.precio_unitario) }}</td><td class="text-end fw-bold">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td></tr>{% endfor %}</tbody><tfoot class="table-light"><tr><th colspan="3" class="text-end">Total:</th><th class="text-end">${{ "%.2f"|format(venta.monto_total) }}</th></tr></tfoot></table></div></div>
-            </div>
-
-            <!-- Plan de Pagos (Si es Venta a Crédito) -->
-            {% if venta.tipo_pago == 'Credito' %}
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-tasks me-2 text-primary"></i> Plan de Pagos</h5></div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                            <tr>
-                                <th class="text-center"># Cuota</th>
-                                <th>Vencimiento</th>
-                                <th class="text-end">Total Cuota</th>
-                                <th class="text-center">Estado</th>
-                                <th class="text-center">Acciones</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for cuota in venta.plan_pagos %}
-                            <tr>
-                                <td class="text-center fw-bold">{{ cuota.numero_cuota }}</td>
-                                <td>{{ cuota.fecha_vencimiento.strftime('%Y-%m-%d') }}</td>
-                                <td class="text-end fw-bold">${{ "%.2f"|format(cuota.monto_total_cuota) }}</td>
-                                <td class="text-center"><span class="badge {% if cuota.estado == 'Pagada' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ cuota.estado }}</span></td>
-                                <td class="text-center">
-                                    {% if cuota.estado == 'Pendiente' %}
-                                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#pagoCuotaModal-{{ cuota.id }}">Pagar</button>
-                                    {% elif cuota.pago %}
-                                    {# Aquí podríamos enlazar a un detalle del pago si existiera #}
-                                    <span class="text-success"><i class="fas fa-check-circle"></i></span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
+                {% else %}
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i> Resumen Financiero</h5></div>
+                        <div class="card-body">
+                            <div class="row mb-4"><div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Monto Total</h6><h4 class="text-dark">${{ "%.2f"|format(venta.monto_total) }}</h4></div></div><div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Total Pagado</h6><h4 class="text-success">${{ "%.2f"|format(total_pagado) }}</h4></div></div><div class="col-md-4"><div class="border rounded p-3 text-center"><h6 class="text-muted">Saldo Pendiente</h6><h4 class="text-danger">${{ "%.2f"|format(venta.monto_total - total_pagado) }}</h4></div></div></div>
+                            {% if venta.monto_total > 0 and (total_pagado / venta.monto_total) <= 1 %}
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Progreso de pago</span>
+                                        {% set porcentaje_pagado = (total_pagado / venta.monto_total) * 100 %}
+                                        <span>{{ "%.0f"|format(porcentaje_pagado) }}%</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ porcentaje_pagado }}%;" aria-valuenow="{{ porcentaje_pagado }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-            </div>
-            {% endif %}
+                {% endif %}
 
-            {% if venta.notas %}<div class="card border-0 shadow-sm"><div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-sticky-note me-2 text-primary"></i> Notas</h5></div><div class="card-body"><div class="bg-light p-3 rounded"><p class="mb-0">{{ venta.notas | replace('\n', '<br>') | safe }}</p></div></div></div>{% endif %}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-box me-2 text-primary"></i> Resumen de Artículos Activos</h5></div>
+                    <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Producto</th><th class="text-center">Cantidad</th><th class="text-end">Precio Unitario</th><th class="text-end">Subtotal</th></tr></thead><tbody>{% for item in productos_activos %}<tr><td>{{ item.producto.nombre }}<div class="text-muted" style="font-size: 0.8em;">{% for val in item.producto.valores_atributos %}{{ val.atributo.nombre_atributo }}: {{ val.valor }}<br>{% endfor %}</div></td><td class="text-center">{{ item.cantidad }}</td><td class="text-end">${{ "%.2f"|format(item.precio_unitario) }}</td><td class="text-end fw-bold">${{ "%.2f"|format(item.subtotal) }}</td></tr>{% else %}<tr><td colspan="4" class="text-center p-4">No hay artículos activos en esta venta.</td></tr>{% endfor %}</tbody><tfoot class="table-light"><tr><th colspan="3" class="text-end">Total Final:</th><th class="text-end">${{ "%.2f"|format(venta.monto_total) }}</th></tr></tfoot></table></div></div>
+                </div>
+
+                {% if venta.tipo_pago == 'Credito' %}<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-tasks me-2 text-primary"></i> Plan de Pagos</h5></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th class="text-center"># Cuota</th><th>Vencimiento</th><th class="text-end">Total Cuota</th><th class="text-center">Estado</th><th class="text-center">Acciones</th></tr></thead><tbody>{% for cuota in venta.plan_pagos %}<tr><td class="text-center fw-bold">{{ cuota.numero_cuota }}</td><td>{{ cuota.fecha_vencimiento.strftime('%Y-%m-%d') }}</td><td class="text-end fw-bold">${{ "%.2f"|format(cuota.monto_total_cuota) }}</td><td class="text-center"><span class="badge {% if cuota.estado == 'Pagada' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ cuota.estado }}</span></td><td class="text-center">{% if cuota.estado == 'Pendiente' %}<button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#pagoCuotaModal-{{ cuota.id }}">Pagar</button>{% elif cuota.pago %}<span class="text-success"><i class="fas fa-check-circle"></i></span>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div></div>{% endif %}
+
+                {% if venta.notas %}<div class="card border-0 shadow-sm"><div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-sticky-note me-2 text-primary"></i> Notas</h5></div><div class="card-body"><div class="bg-light p-3 rounded"><p class="mb-0">{{ venta.notas | replace('\n', '<br>') | safe }}</p></div></div></div>{% endif %}
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-history me-2 text-primary"></i> Historial de la Venta</h5></div>
+                    <div class="card-body p-0"><ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Venta Original</strong><span class="float-end">{{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</span></li>
+                        {% for pago in pagos_ordenados %}<li class="list-group-item">Pago Recibido <span class="badge bg-light text-dark">{{ pago.metodo_pago }}</span><span class="float-end text-success fw-bold">+ ${{ "%.2f"|format(pago.monto_pago) }}</span></li>{% endfor %}
+                        {% for dev in historial_devoluciones %}<li class="list-group-item">Devolución / Cambio <a href="{{ url_for('admin.ver_devolucion', id=dev.id) }}" class="badge bg-warning text-dark text-decoration-none">Ver Detalle</a><span class="float-end text-danger fw-bold">- ${{ "%.2f"|format(dev.monto_total_devolucion) }}</span></li>{% endfor %}
+                    </ul></div>
+                </div>
+
+                {% if venta.estado == 'Pendiente' and venta.tipo_pago == 'Contado' %}<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-primary text-white py-3"><h5 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i> Registrar Pago</h5></div><div class="card-body"><form action="{{ url_for('admin.agregar_pago', id=venta.id) }}" method="post" novalidate enctype="multipart/form-data">{{ pago_form.hidden_tag() }}<div class="mb-3">{{ pago_form.monto_pago.label(class="form-label fw-bold") }}<div class="input-group"><span class="input-group-text">$</span>{{ pago_form.monto_pago(class="form-control form-control-lg", placeholder="0.00") }}</div><div class="form-text">Saldo pendiente: ${{ "%.2f"|format(venta.monto_total - total_pagado) }}</div></div><div class="mb-3">{{ pago_form.metodo_pago.label(class="form-label fw-bold") }}{{ pago_form.metodo_pago(class="form-select", id="metodo_pago_select") }}</div><div class="mb-3" id="comprobante_field" style="display: none;">{{ pago_form.comprobante.label(class="form-label fw-bold") }}{{ pago_form.comprobante(class="form-control") }}<div class="form-text">Formatos permitidos: JPG, PNG.</div></div><div class="d-grid">{{ pago_form.submit(class="btn btn-primary btn-lg") }}</div></form></div></div>{% endif %}
+            </div>
         </div>
 
-        <!-- Columna Derecha: Pagos -->
-        <div class="col-lg-5">
-            <!-- Formulario de Pago (SOLO para ventas de Contado) -->
-            {% if venta.estado == 'Pendiente' and venta.tipo_pago == 'Contado' %}
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-primary text-white py-3"><h5 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i> Registrar Pago</h5></div>
-                <div class="card-body">
-                    <form action="{{ url_for('admin.agregar_pago', id=venta.id) }}" method="post" novalidate enctype="multipart/form-data">
-                        {{ pago_form.hidden_tag() }}
-                        <div class="mb-3">{{ pago_form.monto_pago.label(class="form-label fw-bold") }}<div class="input-group"><span class="input-group-text">$</span>{{ pago_form.monto_pago(class="form-control form-control-lg", placeholder="0.00") }}</div><div class="form-text">Saldo pendiente: ${{ "%.2f"|format(venta.monto_total - total_pagado) }}</div></div>
-                        <div class="mb-3">{{ pago_form.metodo_pago.label(class="form-label fw-bold") }}{{ pago_form.metodo_pago(class="form-select", id="metodo_pago_select") }}</div>
-                        <div class="mb-3" id="comprobante_field" style="display: none;">{{ pago_form.comprobante.label(class="form-label fw-bold") }}{{ pago_form.comprobante(class="form-control") }}<div class="form-text">Formatos permitidos: JPG, PNG.</div></div>
-                        <div class="d-grid">{{ pago_form.submit(class="btn btn-primary btn-lg") }}</div>
-                    </form>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0"><h5 class="mb-0"><i class="fas fa-history me-2 text-primary"></i> Historial de Pagos</h5></div>
-                <div class="card-body p-0">
-                    {% if venta.pagos.count() > 0 %}<div class="list-group list-group-flush">{% for pago in venta.pagos %}<div class="list-group-item"><div class="d-flex justify-content-between align-items-center"><div><h6 class="mb-0">${{ "%.2f"|format(pago.monto_pago) }}</h6><small class="text-muted">{{ pago.fecha_pago.strftime('%Y-%m-%d %H:%M') }}</small></div><div class="text-end"><span class="badge bg-light text-dark">{{ pago.metodo_pago }}</span>{% if pago.comprobante_path %}<a href="{{ url_for('static', filename=pago.comprobante_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-file-invoice"></i> Comprobante</a>{% endif %}</div></div></div>{% endfor %}</div>{% else %}<div class="text-center py-5"><i class="fas fa-receipt fa-3x text-muted mb-3"></i><p class="text-muted">No hay pagos registrados</p></div>{% endif %}
-                </div>
+        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+            <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i> Volver a la Lista</a>
+            <div>
+                {% if venta.estado in ['Pagada', 'Credito', 'Con Devolucion'] %}
+                    {% if devolucion_permitida %}
+                        <a href="{{ url_for('admin.procesar_devolucion', venta_id=venta.id) }}" class="btn btn-warning me-2"><i class="fas fa-undo"></i> Procesar Devolución / Cambio</a>
+                    {% else %}
+                        <button type="button" class="btn btn-outline-secondary me-2" disabled data-bs-toggle="tooltip" data-bs-placement="top" title="{{ mensaje_devolucion }}"><i class="fas fa-undo"></i> Devolución Expirada</button>
+                    {% endif %}
+                {% endif %}
+                {% if venta.tipo_pago == 'Credito' %}<a href="{{ url_for('admin.generar_plan_pago', id=venta.id) }}" class="btn btn-info me-2"><i class="fas fa-tasks me-2"></i> Plan de Pagos</a>{% endif %}
+                <a href="{{ url_for('admin.generar_recibo_venta', id=venta.id) }}" class="btn btn-outline-primary"><i class="fas fa-file-alt me-2"></i> Recibo / Edo. Cuenta</a>
+                {% if venta.estado == 'Pagada' %}<a href="{{ url_for('admin.generar_factura_venta', id=venta.id) }}" class="btn btn-primary ms-2"><i class="fas fa-file-invoice-dollar me-2"></i> Factura Final</a>{% endif %}
             </div>
         </div>
+
+        {% if request.args.get('generated_image_url') and request.args.get('v') %}<div class="card border-0 shadow-sm mt-4"><div class="card-header bg-white py-3"><h5 class="mb-0"><i class="fas fa-receipt me-2 text-primary"></i> Vista Previa del Documento</h5></div><div class="card-body text-center">{% set full_image_url = request.args.get('generated_image_url') + '?v=' + request.args.get('v') %}<a href="{{ full_image_url }}" target="_blank"><img src="{{ full_image_url }}" class="img-fluid rounded border shadow-sm" alt="Vista previa" style="max-height: 400px;"></a><p class="mt-3 mb-3 text-muted">Haz clic en la imagen para verla en tamaño completo.</p><div class="d-grid gap-2 d-md-flex justify-content-md-center"><a href="{{ full_image_url }}" download="documento-venta-{{ venta.id }}.png" class="btn btn-success"><i class="fas fa-download me-2"></i> Descargar</a><button id="share-button" class="btn btn-primary"><i class="fas fa-share-alt me-2"></i> Compartir</button></div></div></div>{% endif %}
     </div>
 
-    <!-- Acciones -->
-    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-        <a href="{{ url_for('admin.listar_ventas') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i> Volver a la Lista
-        </a>
-        <div>
-            {% if venta.estado in ['Pagada', 'Credito', 'Con Devolucion'] %}
-            <a href="{{ url_for('admin.procesar_devolucion', venta_id=venta.id) }}" class="btn btn-warning me-2">
-                <i class="fas fa-undo"></i> Procesar Devolución
-            </a>
-            {% endif %} {# <-- AÑADE ESTA LÍNEA PARA CERRAR EL PRIMER IF #}
+    {% if venta.tipo_pago == 'Credito' %}{% for cuota in venta.plan_pagos %}{% if cuota.estado == 'Pendiente' %}<div class="modal fade" id="pagoCuotaModal-{{ cuota.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Registrar Pago para Cuota #{{ cuota.numero_cuota }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form action="{{ url_for('admin.pagar_cuota', cuota_id=cuota.id) }}" method="post" novalidate enctype="multipart/form-data">{{ pago_cuota_form.hidden_tag() }}<div class="modal-body"><p><strong>Monto de la Cuota: ${{ "%.2f"|format(cuota.monto_total_cuota) }}</strong></p><div class="mb-3">{{ pago_cuota_form.monto_pago.label(class="form-label") }}{{ pago_cuota_form.monto_pago(class="form-control", value=cuota.monto_total_cuota) }}</div><div class="mb-3">{{ pago_cuota_form.metodo_pago.label(class="form-label") }}{{ pago_cuota_form.metodo_pago(class="form-select") }}</div><div class="mb-3">{{ pago_cuota_form.comprobante.label(class="form-label") }}{{ pago_cuota_form.comprobante(class="form-control") }}</div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>{{ pago_cuota_form.submit(class="btn btn-primary") }}</div></form></div></div></div>{% endif %}{% endfor %}{% endif %}
+{% endblock %}
 
-            {% if venta.tipo_pago == 'Credito' %}
-            <a href="{{ url_for('admin.generar_plan_pago', id=venta.id) }}" class="btn btn-info me-2">
-                <i class="fas fa-tasks me-2"></i> Plan de Pagos
-            </a>
-            {% endif %}
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl) });
 
-            <a href="{{ url_for('admin.generar_recibo_venta', id=venta.id) }}" class="btn btn-outline-primary">
-                <i class="fas fa-file-alt me-2"></i> Recibo / Edo. Cuenta
-            </a>
-
-            {% if venta.estado == 'Pagada' %}
-            <a href="{{ url_for('admin.generar_factura_venta', id=venta.id) }}" class="btn btn-primary ms-2">
-                <i class="fas fa-file-invoice-dollar me-2"></i> Factura Final
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Vista Previa del Documento Generado -->
-    {% if request.args.get('generated_image_url') and request.args.get('v') %}<div class="card border-0 shadow-sm mt-4"><div class="card-header bg-white py-3"><h5 class="mb-0"><i class="fas fa-receipt me-2 text-primary"></i> Vista Previa del Documento</h5></div><div class="card-body text-center">{% set full_image_url = request.args.get('generated_image_url') + '?v=' + request.args.get('v') %}<a href="{{ full_image_url }}" target="_blank"><img src="{{ full_image_url }}" class="img-fluid rounded border shadow-sm" alt="Vista previa" style="max-height: 400px;"></a><p class="mt-3 mb-3 text-muted">Haz clic en la imagen para verla en tamaño completo.</p><div class="d-grid gap-2 d-md-flex justify-content-md-center"><a href="{{ full_image_url }}" download="documento-venta-{{ venta.id }}.png" class="btn btn-success"><i class="fas fa-download me-2"></i> Descargar</a><button id="share-button" class="btn btn-primary"><i class="fas fa-share-alt me-2"></i> Compartir</button></div></div></div>{% endif %}
-</div>
-
-<!-- Modales de Pago de Cuotas -->
-{% if venta.tipo_pago == 'Credito' %}
-{% for cuota in venta.plan_pagos %}
-{% if cuota.estado == 'Pendiente' %}
-<div class="modal fade" id="pagoCuotaModal-{{ cuota.id }}" tabindex="-1" aria-labelledby="pagoCuotaModalLabel-{{ cuota.id }}" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="pagoCuotaModalLabel-{{ cuota.id }}">Registrar Pago para Cuota #{{ cuota.numero_cuota }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ url_for('admin.pagar_cuota', cuota_id=cuota.id) }}" method="post" novalidate enctype="multipart/form-data">
-                {{ pago_cuota_form.hidden_tag() }}
-                <div class="modal-body">
-                    <p><strong>Monto de la Cuota: ${{ "%.2f"|format(cuota.monto_total_cuota) }}</strong></p>
-                    <div class="mb-3">
-                        {{ pago_cuota_form.monto_pago.label(class="form-label") }}
-                        {{ pago_cuota_form.monto_pago(class="form-control", value=cuota.monto_total_cuota) }}
-                    </div>
-                    <div class="mb-3">
-                        {{ pago_cuota_form.metodo_pago.label(class="form-label") }}
-                        {{ pago_cuota_form.metodo_pago(class="form-select") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ pago_cuota_form.comprobante.label(class="form-label") }}
-                        {{ pago_cuota_form.comprobante(class="form-control") }}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    {{ pago_cuota_form.submit(class="btn btn-primary") }}
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endif %}
-{% endfor %}
-{% endif %}
-
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const metodoSelect = document.getElementById('metodo_pago_select');
-        const comprobanteField = document.getElementById('comprobante_field');
-        if (metodoSelect) {
-            function toggleComprobanteField() {
-                if (comprobanteField) {
-                    comprobanteField.style.display = metodoSelect.value === 'Transferencia' ? 'block' : 'none';
-                }
-            }
-            metodoSelect.addEventListener('change', toggleComprobanteField);
-            toggleComprobanteField();
-        }
-
-        const shareButton = document.getElementById('share-button');
-        const imageUrlBase = "{{ request.args.get('generated_image_url') or '' }}";
-        const imageTimestamp = "{{ request.args.get('v') or '' }}";
-        const fullImageUrl = imageUrlBase && imageTimestamp ? `${imageUrlBase}?v=${imageTimestamp}` : '';
-        const fileName = "recibo-venta-{{ venta.id }}.png";
-
-        if (shareButton && navigator.share && fullImageUrl) {
-            shareButton.addEventListener('click', async () => {
-                try {
-                    const response = await fetch(fullImageUrl);
-                    const blob = await response.blob();
-                    const file = new File([blob], fileName, { type: blob.type });
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            files: [file],
-                            title: 'Recibo de Venta',
-                            text: 'Aquí está el recibo de tu compra en Mi Tienda.'
-                        });
-                    } else {
-                        alert("Tu navegador no soporta compartir este tipo de archivo.");
+            const metodoSelect = document.getElementById('metodo_pago_select');
+            const comprobanteField = document.getElementById('comprobante_field');
+            if (metodoSelect) {
+                function toggleComprobanteField() {
+                    if (comprobanteField) {
+                        comprobanteField.style.display = metodoSelect.value === 'Transferencia' ? 'block' : 'none';
                     }
-                } catch (err) {
-                    console.error('Error al compartir la imagen:', err);
-                    alert("Hubo un error al intentar compartir la imagen.");
                 }
-            });
-        } else if (shareButton) {
-            shareButton.style.display = 'none';
-        }
+                metodoSelect.addEventListener('change', toggleComprobanteField);
+                toggleComprobanteField();
+            }
 
-        const montoPagoField = document.querySelector('input[name="monto_pago"]');
-        if (montoPagoField) {
-            montoPagoField.addEventListener('focus', function() {
-                this.select();
-            });
+            const shareButton = document.getElementById('share-button');
+            const imageUrlBase = "{{ request.args.get('generated_image_url') or '' }}";
+            const imageTimestamp = "{{ request.args.get('v') or '' }}";
+            const fullImageUrl = imageUrlBase && imageTimestamp ? `${imageUrlBase}?v=${imageTimestamp}` : '';
+            const fileName = "recibo-venta-{{ venta.id }}.png";
 
-            const saldoPendiente = {{ venta.monto_total - total_pagado }};
-            montoPagoField.addEventListener('click', function() {
-                if (!this.value || this.value == "0.00") {
-                    this.value = saldoPendiente.toFixed(2);
-                }
-            });
-        }
-    });
-</script>
+            if (shareButton && navigator.share && fullImageUrl) {
+                shareButton.addEventListener('click', async () => {
+                    try {
+                        const response = await fetch(fullImageUrl);
+                        const blob = await response.blob();
+                        const file = new File([blob], fileName, { type: blob.type });
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file], title: 'Recibo de Venta', text: 'Aquí está el recibo de tu compra en Mi Tienda.' });
+                        } else {
+                            alert("Tu navegador no soporta compartir este tipo de archivo.");
+                        }
+                    } catch (err) {
+                        console.error('Error al compartir la imagen:', err);
+                        alert("Hubo un error al intentar compartir la imagen.");
+                    }
+                });
+            } else if (shareButton) {
+                shareButton.style.display = 'none';
+            }
+
+            const montoPagoField = document.querySelector('input[name="monto_pago"]');
+            if (montoPagoField) {
+                montoPagoField.addEventListener('focus', function() { this.select(); });
+                const saldoPendiente = {{ (venta.monto_total - total_pagado)|round(2) }};
+                montoPagoField.addEventListener('click', function() {
+                    if (!this.value || parseFloat(this.value) == 0.00) { this.value = saldoPendiente.toFixed(2); }
+                });
+            }
+        });
+    </script>
 {% endblock %}

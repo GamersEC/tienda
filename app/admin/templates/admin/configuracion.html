@@ -3,70 +3,87 @@
 {% block title %}{{ titulo }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">{{ titulo }}</h1>
-</div>
-
-<p class="text-muted">
-    Define la información clave de tu negocio. Estos datos aparecerán en los documentos generados
-    como recibos, planes de pago y facturas.
-</p>
-
-<div class="card shadow-sm">
-    <div class="card-body">
-        <!-- enctype es crucial para la subida de archivos -->
-        <form method="post" novalidate enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    {{ form.nombre_tienda.label(class="form-label fw-bold") }}
-                    {{ form.nombre_tienda(class="form-control") }}
-                </div>
-                <div class="col-md-6 mb-3">
-                    {{ form.ruc.label(class="form-label fw-bold") }}
-                    {{ form.ruc(class="form-control") }}
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    {{ form.telefono.label(class="form-label fw-bold") }}
-                    {{ form.telefono(class="form-control") }}
-                </div>
-                <div class="col-md-6 mb-3">
-                    {{ form.email.label(class="form-label fw-bold") }}
-                    {{ form.email(class="form-control", placeholder="ejemplo@tienda.com") }}
-                    {% for error in form.email.errors %}
-                    <div class="invalid-feedback d-block">{{ error }}</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="mb-3">
-                {{ form.direccion.label(class="form-label fw-bold") }}
-                {{ form.direccion(class="form-control") }}
-            </div>
-
-            <hr class="my-4">
-
-            <div class="mb-3">
-                {{ form.logo.label(class="form-label fw-bold") }}
-                {{ form.logo(class="form-control") }}
-                <div class="form-text">Sube un nuevo logo para reemplazar el actual. Formatos permitidos: JPG, PNG.</div>
-
-                {% if config.logo_path %}
-                <div class="mt-3">
-                    <small>Logo Actual:</small><br>
-                    <img src="{{ url_for('static', filename=config.logo_path) }}" alt="Logo Actual" style="max-height: 80px; background-color: #f0f0f0; padding: 5px; border-radius: 5px;">
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="mt-4 d-flex justify-content-end">
-                {{ form.submit(class="btn btn-primary") }}
-            </div>
-        </form>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">{{ titulo }}</h1>
     </div>
-</div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" novalidate enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+
+                <h5 class="mb-3">Información del Negocio</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.nombre_tienda.label(class="form-label fw-bold") }}{{ form.nombre_tienda(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.ruc.label(class="form-label fw-bold") }}{{ form.ruc(class="form-control") }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.telefono.label(class="form-label fw-bold") }}{{ form.telefono(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.email.label(class="form-label fw-bold") }}{{ form.email(class="form-control") }}</div>
+                </div>
+                <div class="mb-3">{{ form.direccion.label(class="form-label fw-bold") }}{{ form.direccion(class="form-control") }}</div>
+
+                <hr class="my-4">
+
+                <h5 class="mb-3">Reglas de Negocio</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.dias_max_devolucion.label(class="form-label fw-bold") }}
+                        {{ form.dias_max_devolucion(class="form-control", type="number", min="0") }}
+                        <div class="form-text">Días tras la venta para aceptar devoluciones. 0 para desactivar.</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.monto_minimo_credito.label(class="form-label fw-bold") }}
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.monto_minimo_credito(class="form-control") }}
+                        </div>
+                        <div class="form-text">Una venta debe superar este monto para poder ofrecer crédito.</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ form.cuotas_maximas_diario.label(class="form-label fw-bold") }}
+                        {{ form.cuotas_maximas_diario(class="form-control", type="number", min="1") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.cuotas_maximas_semanal.label(class="form-label fw-bold") }}
+                        {{ form.cuotas_maximas_semanal(class="form-control", type="number", min="1") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.cuotas_maximas_mensual.label(class="form-label fw-bold") }}
+                        {{ form.cuotas_maximas_mensual(class="form-control", type="number", min="1") }}
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <h5 class="mb-3">Personalización de Documentos</h5>
+                <div class="row align-items-center">
+                    <div class="col-md-3 mb-3">
+                        {{ form.moneda_simbolo.label(class="form-label fw-bold") }}
+                        {{ form.moneda_simbolo(class="form-control") }}
+                    </div>
+                    <div class="col-md-9 mb-3">
+                        {{ form.pie_pagina_recibo.label(class="form-label fw-bold") }}
+                        {{ form.pie_pagina_recibo(class="form-control") }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form.logo.label(class="form-label fw-bold") }}
+                    {{ form.logo(class="form-control") }}
+                    {% if config.logo_path %}
+                        <div class="mt-3">
+                            <small>Logo Actual:</small><br>
+                            <img src="{{ url_for('static', filename=config.logo_path) }}" alt="Logo Actual" style="max-height: 80px; background-color: #f0f0f0; padding: 5px; border-radius: 5px;">
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
 {% endblock %}
