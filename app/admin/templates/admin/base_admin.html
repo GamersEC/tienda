@@ -106,12 +106,12 @@
                             <i class="fas fa-shopping-cart"></i> Ventas
                         </a>
                     </li>
-                    <!-- === NUEVO ENLACE A GASTOS === -->
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'admin.listar_gastos' %}active{% endif %}" href="{{ url_for('admin.listar_gastos') }}">
                             <i class="fas fa-receipt"></i> Gastos
                         </a>
                     </li>
+                    <li class="nav-item"><a class="nav-link {% if 'devolucion' in request.endpoint %}active{% endif %}" href="{{ url_for('admin.listar_devoluciones') }}"><i class="fas fa-undo"></i> Devoluciones</a></li>
                 </ul>
 
                 <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">

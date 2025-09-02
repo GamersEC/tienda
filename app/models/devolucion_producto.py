@@ -5,7 +5,7 @@ class DevolucionProducto(db.Model):
     devolucion_id = db.Column(db.Integer, db.ForeignKey('devolucion.id'), nullable=False)
     producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
     cantidad_devuelta = db.Column(db.Integer, nullable=False)
-    devuelto_al_stock = db.Column(db.Boolean, default=True, nullable=False) #Para indicar si el producto volvió al inventario
+    devuelto_al_stock = db.Column(db.Boolean, default=True, nullable=False)
 
     #Relaciones
     devolucion = db.relationship('Devolucion', back_populates='productos_devueltos')

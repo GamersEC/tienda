@@ -3,293 +3,244 @@
 {% block title %}Registrando Venta #{{ venta.id }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h2 class="mb-0">Registrando Venta #{{ venta.id }}</h2>
-        <span class="fs-5 text-muted">Cliente: {{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</span>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Registrando Venta #{{ venta.id }}</h2>
+            <span class="fs-5 text-muted">Cliente: {{ venta.cliente.nombre }} {{ venta.cliente.apellido or '' }}</span>
+        </div>
+        {% if current_user.is_admin %}
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#anularVentaModal">
+                <i class="fas fa-times-circle"></i> Anular Venta
+            </button>
+        {% endif %}
     </div>
-    {% if current_user.is_admin %}
-    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#anularVentaModal">
-        <i class="fas fa-times-circle"></i> Anular Venta
-    </button>
-    {% endif %}
-</div>
-<hr>
+    <hr>
 
-<div class="row g-4">
-    <!-- Columna Izquierda: Añadir Producto y Lista de Productos -->
-    <div class="col-lg-7">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white"><h4 class="mb-0">1. Añadir Productos</h4></div>
-            <div class="card-body">
-                <form method="post" novalidate id="add-product-form">
-                    {{ agregar_producto_form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ agregar_producto_form.producto.label(class="form-label") }}
-                        {{ agregar_producto_form.producto(class="form-select") }}
-                        <div id="stock-info" class="form-text text-success fw-bold mt-2"></div>
-                    </div>
-                    <div class="mb-3">
-                        {{ agregar_producto_form.cantidad.label(class="form-label") }}
-                        {{ agregar_producto_form.cantidad(class="form-control") }}
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" name="submit_producto" value="agregar" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Añadir Producto a Venta
-                        </button>
-                    </div>
-                </form>
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white"><h4 class="mb-0">1. Añadir Productos</h4></div>
+                <div class="card-body">
+                    <form method="post" novalidate id="add-product-form">
+                        {{ agregar_producto_form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ agregar_producto_form.producto.label(class="form-label") }}
+                            {{ agregar_producto_form.producto(class="form-select") }}
+                            <div id="stock-info" class="form-text text-success fw-bold mt-2"></div>
+                        </div>
+                        <div class="mb-3">
+                            {{ agregar_producto_form.cantidad.label(class="form-label") }}
+                            {{ agregar_producto_form.cantidad(class="form-control") }}
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" name="submit_producto" value="agregar" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Añadir Producto a Venta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h4 class="mb-0">Resumen de Productos</h4></div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-center">Cantidad</th>
+                            <th class="text-end">Subtotal</th>
+                            <th class="text-center">Quitar</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in venta.productos_asociados %}
+                            <tr>
+                                <td><strong>{{ item.producto.nombre }}</strong><br>{% for val in item.producto.valores_atributos %}<small class="text-muted">{{ val.atributo.nombre_atributo }}: {{ val.valor }}</small><br>{% endfor %}<small class="text-primary fw-bold">${{ "%.2f"|format(item.precio_unitario) }} c/u</small></td>
+                                <td class="text-center">{{ item.cantidad }}</td>
+                                <td class="text-end">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
+                                <td class="text-center"><form action="{{ url_for('admin.eliminar_producto_venta', venta_id=venta.id, producto_asociado_id=item.id) }}" method="post">{{ agregar_producto_form.hidden_tag() }}<button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Quitar este producto?');">&times;</button></form></td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-center p-4 text-muted">Aún no hay productos en esta venta.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot {% if venta.productos_asociados %} class="table-light" {% endif %}>
+                        <tr>
+                            <th colspan="2" class="text-end fs-5">Total Venta:</th>
+                            <th class="text-end fs-5">${{ "%.2f"|format(venta.monto_total) }}</th>
+                            <th></th>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h4 class="mb-0">Resumen de Productos</h4></div>
-            <div class="card-body p-0">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th class="text-center">Cantidad</th>
-                        <th class="text-end">Subtotal</th>
-                        <th class="text-center">Quitar</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for item in venta.productos_asociados %}
-                    <tr>
-                        <td>
-                            <strong>{{ item.producto.nombre }}</strong>
-                            <br>
-                            {# Bucle para mostrar los atributos del producto #}
-                            {% for val in item.producto.valores_atributos %}
-                            <small class="text-muted">{{ val.atributo.nombre_atributo }}: {{ val.valor }}</small><br>
-                            {% endfor %}
-                            <small class="text-primary fw-bold">${{ "%.2f"|format(item.precio_unitario) }} c/u</small>
-                        </td>
-                        <td class="text-center">{{ item.cantidad }}</td>
-                        <td class="text-end">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
-                        <td class="text-center">
-                            <form action="{{ url_for('admin.eliminar_producto_venta', venta_id=venta.id, producto_asociado_id=item.id) }}" method="post">
-                                {{ agregar_producto_form.hidden_tag() }}
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Quitar este producto?');">&times;</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="4" class="text-center p-4 text-muted">Aún no hay productos en esta venta.</td></tr>
-                    {% endfor %}
-                    </tbody>
-                    <tfoot {% if venta.productos_asociados %} class="table-light" {% endif %}>
-                    <tr>
-                        <th colspan="2" class="text-end fs-5">Total Venta:</th>
-                        <th class="text-end fs-5">${{ "%.2f"|format(venta.monto_total) }}</th>
-                        <th></th>
-                    </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Columna Derecha: TÉRMINOS DE PAGO Y FINALIZACIÓN -->
-    <div class="col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-success text-white"><h4 class="mb-0">2. Definir Pago y Finalizar</h4></div>
-            <div class="card-body">
-                <form method="post" novalidate enctype="multipart/form-data">
-                    {{ credito_form.hidden_tag() }}
-
-                    <div class="mb-3">
-                        {{ credito_form.tipo_pago.label(class="form-label fw-bold") }}
-                        <div>
-                            {% for subfield in credito_form.tipo_pago %}
-                            <div class="form-check form-check-inline">
-                                {{ subfield(class="form-check-input") }}
-                                {{ subfield.label(class="form-check-label") }}
-                            </div>
-                            {% endfor %}
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white"><h4 class="mb-0">2. Definir Pago y Finalizar</h4></div>
+                <div class="card-body">
+                    <form method="post" novalidate enctype="multipart/form-data">
+                        {{ credito_form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ credito_form.tipo_pago.label(class="form-label fw-bold") }}
+                            <div>{% for subfield in credito_form.tipo_pago %}<div class="form-check form-check-inline">{{ subfield(class="form-check-input") }}{{ subfield.label(class="form-check-label") }}</div>{% endfor %}</div>
                         </div>
-                    </div>
-
-                    <div id="credit-fields" style="display: {% if credito_form.tipo_pago.data == 'Credito' %}block{% else %}none{% endif %};">
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                {{ credito_form.abono_inicial.label(class="form-label") }}
-                                {{ credito_form.abono_inicial(class="form-control", placeholder="0.00") }}
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                {{ credito_form.numero_cuotas.label(class="form-label") }}
-                                {{ credito_form.numero_cuotas(class="form-control", placeholder="Ej: 6") }}
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                {{ credito_form.frecuencia_cuotas.label(class="form-label") }}
-                                {{ credito_form.frecuencia_cuotas(class="form-select") }}
-                            </div>
-                        </div>
-
-                        <!-- NUEVA SECCIÓN PARA MOSTRAR EL CÁLCULO DE CUOTAS -->
-                        <div id="calculo-cuotas-resultado" class="alert alert-info mt-3" style="display: none;">
-                            <!-- El contenido se llenará con JavaScript -->
-                        </div>
-
-                        <div id="abono-payment-fields" class="bg-light p-3 rounded" style="display: none;">
-                            <h6>Detalles del Abono</h6>
+                        <div id="credit-fields" style="display: {% if credito_form.tipo_pago.data == 'Credito' %}block{% else %}none{% endif %};">
                             <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    {{ credito_form.metodo_pago_abono.label(class="form-label") }}
-                                    {{ credito_form.metodo_pago_abono(class="form-select") }}
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    {{ credito_form.comprobante_abono.label(class="form-label") }}
-                                    {{ credito_form.comprobante_abono(class="form-control") }}
-                                    <div class="form-text">Opcional.</div>
-                                </div>
+                                <div class="col-md-4 mb-3">{{ credito_form.abono_inicial.label(class="form-label") }}{{ credito_form.abono_inicial(class="form-control", placeholder="0.00") }}</div>
+                                <div class="col-md-4 mb-3">{{ credito_form.numero_cuotas.label(class="form-label", id="numero-cuotas-label") }}{{ credito_form.numero_cuotas(class="form-control", placeholder="Ej: 6") }}</div>
+                                <div class="col-md-4 mb-3">{{ credito_form.frecuencia_cuotas.label(class="form-label") }}{{ credito_form.frecuencia_cuotas(class="form-select") }}</div>
+                            </div>
+                            <div id="calculo-cuotas-resultado" class="alert alert-info mt-3" style="display: none;"></div>
+                            <div id="abono-payment-fields" class="bg-light p-3 rounded" style="display: none;">
+                                <h6>Detalles del Abono</h6>
+                                <div class="row"><div class="col-md-6 mb-3">{{ credito_form.metodo_pago_abono.label(class="form-label") }}{{ credito_form.metodo_pago_abono(class="form-select") }}</div><div class="col-md-6 mb-3">{{ credito_form.comprobante_abono.label(class="form-label") }}{{ credito_form.comprobante_abono(class="form-control") }}<div class="form-text">Opcional.</div></div></div>
                             </div>
                         </div>
-                    </div>
-
-                    <hr>
-                    <div class="d-grid">
-                        <button type="submit" name="submit_credito" value="finalizar" class="btn btn-success btn-lg">
-                            <i class="fas fa-check-circle"></i> Finalizar Venta
-                        </button>
-                    </div>
-                </form>
+                        <hr>
+                        <div class="d-grid"><button type="submit" name="submit_credito" value="finalizar" class="btn btn-success btn-lg"><i class="fas fa-check-circle"></i> Finalizar Venta</button></div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal para Anulación -->
-{% if current_user.is_admin %}
-<div class="modal fade" id="anularVentaModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Anular Venta #{{ venta.id }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form action="{{ url_for('admin.anular_venta', id=venta.id) }}" method="post" novalidate>
-                <div class="modal-body">
-                    {{ anular_venta_form.hidden_tag() }}
-                    <p><strong>¡Atención!</strong> Esta acción es irreversible. El stock de los productos será devuelto al inventario.</p>
-                    <div class="mb-3">
-                        {{ anular_venta_form.motivo_anulacion.label(class="form-label") }}
-                        {{ anular_venta_form.motivo_anulacion(class="form-control", rows=3, required=true) }}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    {{ anular_venta_form.submit(class="btn btn-danger") }}
-                </div>
-            </form>
+    {% if current_user.is_admin %}
+        <div class="modal fade" id="anularVentaModal" tabindex="-1">
+            <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Anular Venta #{{ venta.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form action="{{ url_for('admin.anular_venta', id=venta.id) }}" method="post" novalidate><div class="modal-body">{{ anular_venta_form.hidden_tag() }}<p><strong>¡Atención!</strong> Esta acción es irreversible. El stock de los productos será devuelto al inventario.</p><div class="mb-3">{{ anular_venta_form.motivo_anulacion.label(class="form-label") }}{{ anular_venta_form.motivo_anulacion(class="form-control", rows=3, required=true) }}</div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>{{ anular_venta_form.submit(class="btn btn-danger") }}</div></form></div></div>
         </div>
-    </div>
-</div>
-{% endif %}
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- SCRIPT PARA MOSTRAR STOCK ---
-        const stockData = {{ stock_data | tojson | safe }};
-        const productSelect = document.getElementById('producto');
-        const stockInfoDiv = document.getElementById('stock-info');
-        function updateStockInfo() {
-            const selectedProductId = productSelect.value;
-            stockInfoDiv.textContent = (selectedProductId && stockData[selectedProductId]) ? `Stock disponible: ${stockData[selectedProductId]} unidades` : '';
-        }
-        if (productSelect) {
-            productSelect.addEventListener('change', updateStockInfo);
-            updateStockInfo();
-        }
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const config_data = {{ config_data | tojson | safe }};
+            const montoTotalVenta = parseFloat("{{ venta.monto_total }}");
+            const stockData = {{ stock_data | tojson | safe }};
 
-        // --- SCRIPT PARA CAMPOS CONDICIONALES DE CRÉDITO ---
-        const tipoPagoRadios = document.querySelectorAll('input[name="tipo_pago"]');
-        const creditFields = document.getElementById('credit-fields');
-        const abonoInicialInput = document.getElementById('abono_inicial');
-        const abonoPaymentFields = document.getElementById('abono-payment-fields');
+            const productSelect = document.getElementById('producto');
+            const stockInfoDiv = document.getElementById('stock-info');
+            const tipoPagoRadios = document.querySelectorAll('input[name="tipo_pago"]');
+            const creditFields = document.getElementById('credit-fields');
+            const abonoInicialInput = document.getElementById('abono_inicial');
+            const abonoPaymentFields = document.getElementById('abono-payment-fields');
+            const numeroCuotasInput = document.getElementById('numero_cuotas');
+            const frecuenciaSelect = document.getElementById('frecuencia_cuotas');
+            const numeroCuotasLabel = document.getElementById('numero-cuotas-label');
+            const calculoResultadoDiv = document.getElementById('calculo-cuotas-resultado');
+            const csrfToken = "{{ credito_form.csrf_token._value() }}";
 
-        function toggleCreditFields() {
-            const selectedValue = document.querySelector('input[name="tipo_pago"]:checked').value;
-            creditFields.style.display = selectedValue === 'Credito' ? 'block' : 'none';
-            calcularCuotas(); // Recalcular al cambiar de tipo de pago
-        }
-
-        function toggleAbonoPaymentFields() {
-            if (abonoInicialInput) {
-                const abonoValue = parseFloat(abonoInicialInput.value);
-                abonoPaymentFields.style.display = (abonoValue && abonoValue > 0) ? 'block' : 'none';
-            }
-        }
-
-        tipoPagoRadios.forEach(radio => radio.addEventListener('change', toggleCreditFields));
-        if (abonoInicialInput) { abonoInicialInput.addEventListener('input', toggleAbonoPaymentFields); }
-
-        // --- SCRIPT PARA CÁLCULO DE CUOTAS EN TIEMPO REAL ---
-        const numeroCuotasInput = document.getElementById('numero_cuotas');
-        const frecuenciaSelect = document.getElementById('frecuencia_cuotas');
-        const calculoResultadoDiv = document.getElementById('calculo-cuotas-resultado');
-        const csrfToken = "{{ credito_form.csrf_token._value() }}";
-
-        async function calcularCuotas() {
-            const tipoPago = document.querySelector('input[name="tipo_pago"]:checked').value;
-            if (tipoPago !== 'Credito') {
-                calculoResultadoDiv.style.display = 'none';
-                return;
+            function updateStockInfo() {
+                if (!productSelect) return;
+                const selectedProductId = productSelect.value;
+                stockInfoDiv.textContent = (selectedProductId && stockData[selectedProductId]) ? `Stock disponible: ${stockData[selectedProductId]} unidades` : '';
             }
 
-            const montoTotalVenta = parseFloat({{ venta.monto_total }});
-            const abono = parseFloat(abonoInicialInput.value) || 0;
-            const numCuotas = parseInt(numeroCuotasInput.value);
-            const frecuencia = frecuenciaSelect.value;
+            function actualizarReglasDeCuotas() {
+                if (!frecuenciaSelect || !numeroCuotasInput || !numeroCuotasLabel) return;
 
-            if (montoTotalVenta > 0 && numCuotas > 0 && frecuencia) {
-                try {
-                    const response = await fetch("{{ url_for('admin.api_calcular_cuotas') }}", {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                        body: JSON.stringify({
-                            monto_total: montoTotalVenta,
-                            abono_inicial: abono,
-                            numero_cuotas: numCuotas,
-                            frecuencia: frecuencia
-                        })
-                    });
-
-                    if (!response.ok) { throw new Error('Error en la respuesta del servidor'); }
-
-                    const data = await response.json();
-
-                    const valorCuota = data.valor_cuota.toFixed(2);
-                    const totalFinanciado = data.total_financiado.toFixed(2);
-                    const totalInteres = data.total_interes.toFixed(2);
-
-                    calculoResultadoDiv.innerHTML = `
-                    <strong>Plan de Pagos:</strong> ${numCuotas} cuotas de <strong>$${valorCuota}</strong>
-                    <br><small>Total a pagar a crédito: $${totalFinanciado} (incluye $${totalInteres} de interés)</small>
-                `;
-                    calculoResultadoDiv.style.display = 'block';
-
-                } catch (error) {
-                    console.error("Error al calcular cuotas:", error);
-                    calculoResultadoDiv.innerHTML = `<span class="text-danger">Error al calcular. Verifique los datos.</span>`;
-                    calculoResultadoDiv.style.display = 'block';
+                const frecuencia = frecuenciaSelect.value;
+                if (frecuencia && config_data.cuotasMaximas[frecuencia]) {
+                    const max = config_data.cuotasMaximas[frecuencia];
+                    numeroCuotasInput.setAttribute('max', max);
+                    numeroCuotasLabel.textContent = `N° de Cuotas (${frecuencia}) (Máx: ${max})`;
+                    if (parseInt(numeroCuotasInput.value) > max) {
+                        numeroCuotasInput.value = max;
+                    }
+                } else {
+                    numeroCuotasLabel.textContent = 'Número de Cuotas';
+                    numeroCuotasInput.removeAttribute('max');
                 }
-            } else {
-                calculoResultadoDiv.style.display = 'none';
             }
-        }
 
-        // Añadir listeners a todos los campos relevantes
-        if(abonoInicialInput) abonoInicialInput.addEventListener('input', calcularCuotas);
-        if(numeroCuotasInput) numeroCuotasInput.addEventListener('input', calcularCuotas);
-        if(frecuenciaSelect) frecuenciaSelect.addEventListener('change', calcularCuotas);
+            function toggleCreditFields() {
+                const selectedRadio = document.querySelector('input[name="tipo_pago"]:checked');
+                if (!selectedRadio) return;
 
-        // Llamadas iniciales para establecer el estado correcto al cargar la página
-        toggleCreditFields();
-        toggleAbonoPaymentFields();
-    });
-</script>
+                const selectedValue = selectedRadio.value;
+
+                if (selectedValue === 'Credito' && montoTotalVenta < config_data.montoMinimoCredito) {
+                    alert(`El monto de la venta ($${montoTotalVenta.toFixed(2)}) es menor al mínimo requerido ($${config_data.montoMinimoCredito.toFixed(2)}) para ofrecer crédito.`);
+                    document.getElementById('tipo_pago-0').checked = true;
+                    creditFields.style.display = 'none';
+                } else {
+                    creditFields.style.display = selectedValue === 'Credito' ? 'block' : 'none';
+                }
+                calcularCuotas();
+            }
+
+            function toggleAbonoPaymentFields() {
+                if (abonoInicialInput) {
+                    const abonoValue = parseFloat(abonoInicialInput.value);
+                    abonoPaymentFields.style.display = (abonoValue && abonoValue > 0) ? 'block' : 'none';
+                }
+            }
+
+            async function calcularCuotas() {
+                const tipoPago = document.querySelector('input[name="tipo_pago"]:checked').value;
+                if (tipoPago !== 'Credito' || !numeroCuotasInput || !frecuenciaSelect) {
+                    calculoResultadoDiv.style.display = 'none';
+                    return;
+                }
+
+                const abono = parseFloat(abonoInicialInput.value) || 0;
+                const numCuotas = parseInt(numeroCuotasInput.value);
+                const frecuencia = frecuenciaSelect.value;
+
+                if (montoTotalVenta > 0 && numCuotas > 0 && frecuencia) {
+                    try {
+                        const response = await fetch("{{ url_for('admin.api_calcular_cuotas') }}", {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify({
+                                monto_total: montoTotalVenta,
+                                abono_inicial: abono,
+                                numero_cuotas: numCuotas,
+                                frecuencia: frecuencia
+                            })
+                        });
+                        if (!response.ok) { throw new Error('Error en la respuesta del servidor'); }
+                        const data = await response.json();
+                        const valorCuota = data.valor_cuota.toFixed(2);
+                        const totalFinanciado = data.total_financiado.toFixed(2);
+                        const totalInteres = data.total_interes.toFixed(2);
+                        calculoResultadoDiv.innerHTML = `<strong>Plan de Pagos:</strong> ${numCuotas} cuotas de <strong>$${valorCuota}</strong><br><small>Total a pagar a crédito: $${totalFinanciado} (incluye $${totalInteres} de interés)</small>`;
+                        calculoResultadoDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error("Error al calcular cuotas:", error);
+                        calculoResultadoDiv.innerHTML = `<span class="text-danger">Error al calcular. Verifique los datos.</span>`;
+                        calculoResultadoDiv.style.display = 'block';
+                    }
+                } else {
+                    calculoResultadoDiv.style.display = 'none';
+                }
+            }
+
+            // Añadir Listeners
+            if (productSelect) {
+                productSelect.addEventListener('change', updateStockInfo);
+            }
+            tipoPagoRadios.forEach(radio => radio.addEventListener('change', toggleCreditFields));
+            if (abonoInicialInput) {
+                abonoInicialInput.addEventListener('input', toggleAbonoPaymentFields);
+                abonoInicialInput.addEventListener('input', calcularCuotas);
+            }
+            if (numeroCuotasInput) {
+                numeroCuotasInput.addEventListener('input', calcularCuotas);
+            }
+            if (frecuenciaSelect) {
+                frecuenciaSelect.addEventListener('change', actualizarReglasDeCuotas);
+                frecuenciaSelect.addEventListener('change', calcularCuotas);
+            }
+
+            // Llamadas iniciales al cargar la página
+            updateStockInfo();
+            toggleCreditFields();
+            toggleAbonoPaymentFields();
+            actualizarReglasDeCuotas();
+        });
+    </script>
 {% endblock %}
